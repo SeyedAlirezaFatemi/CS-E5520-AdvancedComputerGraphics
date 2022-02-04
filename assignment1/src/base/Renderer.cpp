@@ -65,7 +65,7 @@ timingResult Renderer::rayTracePicture(RayTracer* rt, Image* image,
     // YOUR CODE HERE(R5):
     // remove this to enable multithreading (you also need to enable it in the
     // project properties: C++/Language/Open MP support)
-    //#pragma omp parallel for
+    #pragma omp parallel for
     for (int j = 0; j < height; ++j) {
         // Each thread must have its own random generator
         Random rnd;
