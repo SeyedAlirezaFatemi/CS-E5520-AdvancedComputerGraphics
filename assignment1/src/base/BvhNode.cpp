@@ -1,10 +1,8 @@
-
-#include "Bvh.hpp"
 #include <iostream>
 
+#include "Bvh.hpp"
 
 namespace FW {
-
 
 BvhNode::BvhNode(Loader& stream, size_t depth) {
     bool children;
@@ -15,8 +13,8 @@ BvhNode::BvhNode(Loader& stream, size_t depth) {
     stream(children);
 
     if (children) {
-        left.reset(new BvhNode( stream, depth + 1));
-        right.reset(new BvhNode( stream, depth + 1));
+        left.reset(new BvhNode(stream, depth + 1));
+        right.reset(new BvhNode(stream, depth + 1));
     }
 }
 
@@ -33,5 +31,4 @@ void BvhNode::save(Saver& stream) {
     }
 }
 
-
-}
+}  // namespace FW

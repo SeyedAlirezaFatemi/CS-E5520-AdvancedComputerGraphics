@@ -1,23 +1,22 @@
 #pragma once
 
 /*
- * utilities for internal use etc. in the raytracer class and the bvh construction
+ * utilities for internal use etc. in the raytracer class and the bvh
+ * construction
  */
-
-#include "base/Math.hpp"
 
 #include <iostream>
 
+#include "base/Math.hpp"
 
 namespace FW {
 
-
 enum SplitMode {
-	SplitMode_SpatialMedian,
-	SplitMode_ObjectMedian,
-	SplitMode_Sah,
-	SplitMode_None,
-	SplitMode_Linear
+    SplitMode_SpatialMedian,
+    SplitMode_ObjectMedian,
+    SplitMode_Sah,
+    SplitMode_None,
+    SplitMode_Linear
 };
 
 struct Plane : public Vec4f {
@@ -25,7 +24,6 @@ struct Plane : public Vec4f {
         return p.x * x + p.y * y + p.z * z + w;
     }
 };
-
 
 struct AABB {
     Vec3f min, max;
@@ -36,7 +34,6 @@ struct AABB {
         return 2 * (d.x * d.y + d.x * d.z + d.y * d.z);
     }
 };
-
 
 inline std::ostream& operator<<(std::ostream& os, const FW::Vec3f& v) {
     return os << "(" << v.x << ", " << v.y << ", " << v.z << ")";
@@ -50,5 +47,4 @@ inline std::ostream& operator<<(std::ostream& os, const AABB& bb) {
     return os << "BB(" << bb.min << ", " << bb.max << ")";
 }
 
-
-}
+}  // namespace FW

@@ -19,7 +19,7 @@ std::istream& fileload(std::istream& os, T& x) {
 }
 
 class Saver : noncopyable {
-public:
+   public:
     Saver(std::ostream& os, Statusbar& sbar) : os(os), sbar(sbar) {}
     template <class T>
     Saver& operator()(const T& x) {
@@ -27,13 +27,14 @@ public:
         return *this;
     }
     void statusbar(size_t counter) { sbar.update(counter); }
-private:
+
+   private:
     std::ostream& os;
     Statusbar& sbar;
 };
 
 class Loader : noncopyable {
-public:
+   public:
     Loader(std::istream& is, Statusbar& sbar) : is(is), sbar(sbar) {}
     template <class T>
     Loader& operator()(T& x) {
@@ -41,7 +42,8 @@ public:
         return *this;
     }
     void statusbar(size_t counter) { sbar.update(counter); }
-private:
+
+   private:
     std::istream& is;
     Statusbar& sbar;
 };
