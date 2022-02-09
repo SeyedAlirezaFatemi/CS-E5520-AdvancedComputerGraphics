@@ -24,10 +24,10 @@ struct BvhNode : noncopyable {
     std::unique_ptr<BvhNode> left;
     std::unique_ptr<BvhNode> right;
 
-    BvhNode() : bb(), startPrim(0), endPrim(0) {}
+    BvhNode() : bb(), startPrim(0), endPrim(0), left(nullptr), right(nullptr) {}
 
     BvhNode::BvhNode(size_t start, size_t end)
-        : bb(), startPrim(start), endPrim(end) {}
+        : bb(), startPrim(start), endPrim(end), left(nullptr), right(nullptr) {}
 
     BvhNode(Loader& is, size_t depth = 0);
 

@@ -6,6 +6,8 @@
  */
 
 #include <iostream>
+#include <limits>
+#include <tuple>
 
 #include "base/Math.hpp"
 
@@ -32,6 +34,29 @@ struct AABB {
     inline F32 area() const {
         Vec3f d(max - min);
         return 2 * (d.x * d.y + d.x * d.z + d.y * d.z);
+    }
+    std::tuple<bool, float> intersect(const Vec3f& orig, const Vec3f& dir,
+                                      const Vec3f& invDir,
+                                      const float tmin) const {
+        float tstart = -std::numeric_limits<float>::max(),
+              tend = std::numeric_limits<float>::max();
+        float t1, t2;
+        for (size_t i = 0; i < 3; i++) {
+            if (dir.get(i) == 0.0) {
+                if (orig.get(i) < min.get(i) || orig.get(i) > max.get(i))
+                    return std::make_tuple(false, 0.0f);
+            } else {
+                t1 = (min.get(i) - orig.get(i)) * invDir.get(i);
+                t2 = (max.get(i) - orig.get(i)) * invDir.get(i);
+                if (t1 > t2) std::swap(t1, t2);
+                tstart = FW::max(tstart, t1);
+                tend = FW::min(tend, t2);
+            }
+        }
+        // Output both start and end to know when enter and when exit. the hit
+        // is not important here.
+        return std::make_tuple(!(tstart > tend || tend < tmin), tstart);
+        //    tstart > tmin ? tstart : tend);
     }
 };
 

@@ -4,7 +4,12 @@
 
 #include <stdio.h>
 
+#include <algorithm>
 #include <fstream>
+#include <limits>
+#include <numeric>
+#include <tuple>
+#include <vector>
 
 #include "base/Defs.hpp"
 #include "base/Math.hpp"
@@ -70,7 +75,164 @@ void RayTracer::constructHierarchy(std::vector<RTTriangle>& triangles,
                                    SplitMode splitMode) {
     // YOUR CODE HERE (R1):
     // This is where you should construct your BVH.
+    Bvh bvh{splitMode, triangles.size()};
+    auto rootAABB{calculateAABB(triangles, bvh.indices(), 0, triangles.size())};
+    bvh.root().bb = rootAABB;
+    buildBVH(triangles, bvh, bvh.root());
+    m_bvh = bvh;
     m_triangles = &triangles;
+    saveHierarchy("test.hierarchy", *m_triangles);
+}
+
+AABB calculateAABB(const std::vector<RTTriangle>& triangles,
+                   const std::vector<uint32_t>& indices, const size_t start,
+                   const size_t end) {
+    AABB result{triangles[indices[start]].min(),
+                triangles[indices[start]].max()};
+    for (size_t i = start; i < end; i++) {
+        const auto& triangleIndex = indices[i];
+        const auto& triangle = triangles[triangleIndex];
+        result.min = FW::min(result.min, triangle.min());
+        result.max = FW::max(result.max, triangle.max());
+    }
+    return result;
+}
+
+AABB calculateCentroidAABB(const std::vector<RTTriangle>& triangles,
+                           const std::vector<uint32_t>& indices,
+                           const size_t start, const size_t end) {
+    AABB result{triangles[indices[start]].centroid(),
+                triangles[indices[start]].centroid()};
+    for (size_t i = start; i < end; i++) {
+        const auto& triangleIndex = indices[i];
+        const auto& triangle = triangles[triangleIndex];
+        result.min = FW::min(result.min, triangle.centroid());
+        result.max = FW::max(result.max, triangle.centroid());
+    }
+    return result;
+}
+
+void buildBVH(const std::vector<RTTriangle>& triangles, Bvh& bvh,
+              BvhNode& node) {
+    // Note that the spatial median split plane should be based on an AABB
+    // spanned by the centroids instead of the actual AABB of the node to ensure
+    // an actual split.
+    // Don't split this node if it has less than 100 triangles
+    if (node.endPrim - node.startPrim < 10) return;
+    // Calculate centroid AABB of nodes
+    const auto bb = calculateCentroidAABB(triangles, bvh.indices(),
+                                          node.startPrim, node.endPrim);
+    // Calculate longestAxisIndex
+    auto diagonal = bb.max - bb.min;
+    size_t longestAxisIndex = 0;
+    if (diagonal.z > diagonal.get(longestAxisIndex)) {
+        longestAxisIndex = 2;
+    }
+    if (diagonal.y > diagonal.get(longestAxisIndex)) {
+        longestAxisIndex = 1;
+    }
+    auto axisCenter =
+        0.5 * (bb.max.get(longestAxisIndex) + bb.min.get(longestAxisIndex));
+    // Partition
+    auto& indices = bvh.indices();
+    auto iter = std::partition(
+        indices.begin() + node.startPrim, indices.begin() + node.endPrim,
+        [longestAxisIndex, axisCenter, &triangles](const size_t& nodeIndex) {
+            return triangles[nodeIndex].centroid().get(longestAxisIndex) <
+                   axisCenter;
+        });
+    auto partitionIndex = iter - indices.begin();
+    // Make two nodes
+    node.right = std::make_unique<BvhNode>(node.startPrim, partitionIndex);
+    node.left = std::make_unique<BvhNode>(partitionIndex, node.endPrim);
+    // Calculate the AABB of the nodes
+    node.right->bb = calculateAABB(triangles, bvh.indices(),
+                                   node.right->startPrim, node.right->endPrim);
+    node.left->bb = calculateAABB(triangles, bvh.indices(),
+                                  node.left->startPrim, node.left->endPrim);
+    // Recursion
+    buildBVH(triangles, bvh, *(node.right));
+    buildBVH(triangles, bvh, *(node.left));
+
+    return;
+}
+
+std::tuple<int, float, float, float> RayTracer::intersectBVH(
+    const BvhNode& node, const Vec3f& orig, const Vec3f& dir,
+    const Vec3f& invDir, float tmin) const {
+    if (node.right == nullptr) {  // Leaf node
+        float umin = 0.0f, vmin = 0.0f;
+        int imin = -1;
+        float t, u, v;
+        for (size_t i = node.startPrim; i < node.endPrim; ++i) {
+            auto triangleIndex = m_bvh.getIndex(i);
+            const RTTriangle& triangle = (*m_triangles)[triangleIndex];
+            if (triangle.intersect_woop(orig, dir, t, u, v)) {
+                if (t > 0.0f && t < tmin) {
+                    imin = triangleIndex;
+                    tmin = t;
+                    umin = u;
+                    vmin = v;
+                }
+            }
+        }
+        return std::make_tuple(imin, tmin, umin, vmin);
+    };
+
+    std::vector<std::tuple<BvhNode&, float>> nodesToCheck;
+    auto rightResult = node.right->bb.intersect(orig, dir, invDir, 0.0f);
+    bool didHitRight = std::get<0>(rightResult);
+    float tright = std::get<1>(rightResult);
+
+    if (didHitRight && tright < tmin)
+        nodesToCheck.emplace_back(*(node.right), tright);
+    auto leftResult = node.left->bb.intersect(orig, dir, invDir, 0.0f);
+    bool didHitLeft = std::get<0>(leftResult);
+    float tleft = std::get<1>(leftResult);
+    if (didHitLeft && tleft < tmin)
+        nodesToCheck.emplace_back(*(node.left), tleft);
+
+    if (nodesToCheck.empty()) {
+        return std::make_tuple(-1, 0.0f, 0.0f, 0.0f);
+    }
+    if (nodesToCheck.size() == 2 &&
+        std::get<1>(nodesToCheck[0]) > std::get<1>(nodesToCheck[1])) {
+        auto tmp0 = nodesToCheck[0];
+        auto tmp1 = nodesToCheck[1];
+        nodesToCheck.clear();
+        nodesToCheck.push_back(tmp1);
+        nodesToCheck.push_back(tmp0);
+    }
+    // We have already compared tstart of nodes with tmin here.
+    int triangleIndex = -1;
+    auto firstIntersectioinResult =
+        intersectBVH(std::get<0>(nodesToCheck[0]), orig, dir, invDir, tmin);
+    triangleIndex = std::get<0>(firstIntersectioinResult);
+    float tfirst = std::get<1>(firstIntersectioinResult);
+    if (triangleIndex != -1) {
+        if (nodesToCheck.size() == 2 && tfirst < std::get<1>(nodesToCheck[1])) {
+            // No need to check the other node. Either the ray didn't hit that
+            // node or it did but the tstart is bigger than tfirst.
+            return firstIntersectioinResult;
+        }
+        // Update tmin
+        if (tfirst < tmin) tmin = tfirst;
+    }
+    if (nodesToCheck.size() == 1) {
+        return firstIntersectioinResult;
+    }
+
+    auto otherIntersectioinResult =
+        intersectBVH(std::get<0>(nodesToCheck[1]), orig, dir, invDir, tmin);
+    int otherTriangleIndex = std::get<0>(otherIntersectioinResult);
+    if (otherTriangleIndex != -1) {
+        float tother = std::get<1>(otherIntersectioinResult);
+        if (tother > tmin) {
+            return firstIntersectioinResult;
+        }
+        return otherIntersectioinResult;
+    }
+    return firstIntersectioinResult;
 }
 
 RaycastResult RayTracer::raycast(const Vec3f& orig, const Vec3f& dir) const {
@@ -84,25 +246,37 @@ RaycastResult RayTracer::raycast(const Vec3f& orig, const Vec3f& dir) const {
     // function to do one-off things per ray like finding the elementwise
     // reciprocal of the ray direction.
 
+    auto invDir = 1.0f / dir;
+
     // You can use this existing code for leaf nodes of the BVH (you do want to
     // change the range of the loop to match the elements the leaf covers.)
     float tmin = 1.0f, umin = 0.0f, vmin = 0.0f;
     int imin = -1;
+    float t_hit = std::numeric_limits<float>::max();
+    // Check if hits the scene then start the recursive call
 
     RaycastResult castresult;
 
     // Naive loop over all triangles; this will give you the correct results,
     // but is terribly slow when ran for all triangles for each ray. Try it.
-    for (int i = 0; i < m_triangles->size(); ++i) {
-        float t, u, v;
-        if ((*m_triangles)[i].intersect_woop(orig, dir, t, u, v)) {
-            if (t > 0.0f && t < tmin) {
-                imin = i;
-                tmin = t;
-                umin = u;
-                vmin = v;
+    if (false) {
+        for (int i = 0; i < m_triangles->size(); ++i) {
+            float t, u, v;
+            if ((*m_triangles)[i].intersect_woop(orig, dir, t, u, v)) {
+                if (t > 0.0f && t < tmin) {
+                    imin = i;
+                    tmin = t;
+                    umin = u;
+                    vmin = v;
+                }
             }
         }
+    } else {
+        auto res = intersectBVH(m_bvh.root(), orig, dir, invDir, tmin);
+        imin = std::get<0>(res);
+        tmin = std::get<1>(res);
+        umin = std::get<2>(res);
+        vmin = std::get<3>(res);
     }
 
     if (imin != -1)
