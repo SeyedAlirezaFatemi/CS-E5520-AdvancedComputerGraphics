@@ -30,8 +30,9 @@ bool fileExists(std::string fileName) { return std::ifstream(fileName).good(); }
 App::App(std::vector<std::string>& cmd_args)
     : m_commonCtrl(CommonControls::Feature_Default &
                    ~CommonControls::Feature_RepaintOnF5),
-      m_cameraCtrl(&m_commonCtrl, CameraControls::Feature_Default |
-                                      CameraControls::Feature_StereoControls),
+      m_cameraCtrl(&m_commonCtrl,
+                   CameraControls::Feature_Default |
+                       CameraControls::Feature_StereoControls),
       m_action(Action_None),
       m_cullMode(CullMode_None),
       m_shadingMode(Renderer::ShadingMode_Headlight),
@@ -46,51 +47,67 @@ App::App(std::vector<std::string>& cmd_args)
     m_commonCtrl.addStateObject(this);
     m_cameraCtrl.setKeepAligned(true);
 
-    m_commonCtrl.addButton((S32*)&m_action, Action_LoadMesh, FW_KEY_M,
+    m_commonCtrl.addButton((S32*)&m_action,
+                           Action_LoadMesh,
+                           FW_KEY_M,
                            "Load mesh or state... (M)");
-    m_commonCtrl.addButton((S32*)&m_action, Action_ReloadMesh, FW_KEY_F5,
-                           "Reload mesh (F5)");
-    m_commonCtrl.addButton((S32*)&m_action, Action_SaveMesh, FW_KEY_O,
-                           "Save mesh... (O)");
-    m_commonCtrl.addButton((S32*)&m_action, Action_LoadBVH, FW_KEY_NONE,
-                           "Load BVH from file...");
+    m_commonCtrl.addButton(
+        (S32*)&m_action, Action_ReloadMesh, FW_KEY_F5, "Reload mesh (F5)");
+    m_commonCtrl.addButton(
+        (S32*)&m_action, Action_SaveMesh, FW_KEY_O, "Save mesh... (O)");
+    m_commonCtrl.addButton(
+        (S32*)&m_action, Action_LoadBVH, FW_KEY_NONE, "Load BVH from file...");
     m_commonCtrl.addSeparator();
 
-    m_commonCtrl.addButton((S32*)&m_action, Action_ResetCamera, FW_KEY_NONE,
-                           "Reset camera");
-    m_commonCtrl.addButton((S32*)&m_action, Action_EncodeCameraSignature,
-                           FW_KEY_NONE, "Encode camera signature");
-    m_commonCtrl.addButton((S32*)&m_action, Action_DecodeCameraSignature,
-                           FW_KEY_NONE, "Decode camera signature...");
+    m_commonCtrl.addButton(
+        (S32*)&m_action, Action_ResetCamera, FW_KEY_NONE, "Reset camera");
+    m_commonCtrl.addButton((S32*)&m_action,
+                           Action_EncodeCameraSignature,
+                           FW_KEY_NONE,
+                           "Encode camera signature");
+    m_commonCtrl.addButton((S32*)&m_action,
+                           Action_DecodeCameraSignature,
+                           FW_KEY_NONE,
+                           "Decode camera signature...");
     m_window.addListener(&m_cameraCtrl);
     m_commonCtrl.addSeparator();
 
-    m_commonCtrl.addButton((S32*)&m_action, Action_NormalizeScale, FW_KEY_NONE,
-                           "Normalize scale");
+    m_commonCtrl.addButton(
+        (S32*)&m_action, Action_NormalizeScale, FW_KEY_NONE, "Normalize scale");
     //    m_commonCtrl.addButton((S32*)&m_action, Action_FlipXY, FW_KEY_NONE,
     //    "Flip X/Y"); m_commonCtrl.addButton((S32*)&m_action, Action_FlipYZ,
     //    FW_KEY_NONE,    "Flip Y/Z"); m_commonCtrl.addButton((S32*)&m_action,
     //    Action_FlipZ,                   FW_KEY_NONE,    "Flip Z");
     m_commonCtrl.addSeparator();
 
-    m_commonCtrl.addButton((S32*)&m_action, Action_NormalizeNormals,
-                           FW_KEY_NONE, "Normalize normals");
-    m_commonCtrl.addButton((S32*)&m_action, Action_FlipNormals, FW_KEY_NONE,
-                           "Flip normals");
-    m_commonCtrl.addButton((S32*)&m_action, Action_RecomputeNormals,
-                           FW_KEY_NONE, "Recompute normals");
-    m_commonCtrl.addButton((S32*)&m_action, Action_PlacePointLight, FW_KEY_HOME,
+    m_commonCtrl.addButton((S32*)&m_action,
+                           Action_NormalizeNormals,
+                           FW_KEY_NONE,
+                           "Normalize normals");
+    m_commonCtrl.addButton(
+        (S32*)&m_action, Action_FlipNormals, FW_KEY_NONE, "Flip normals");
+    m_commonCtrl.addButton((S32*)&m_action,
+                           Action_RecomputeNormals,
+                           FW_KEY_NONE,
+                           "Recompute normals");
+    m_commonCtrl.addButton((S32*)&m_action,
+                           Action_PlacePointLight,
+                           FW_KEY_HOME,
                            "Place point light at camera (Home)");
     m_commonCtrl.addSeparator();
 
-    m_commonCtrl.addToggle((S32*)&m_cullMode, CullMode_None, FW_KEY_NONE,
+    m_commonCtrl.addToggle((S32*)&m_cullMode,
+                           CullMode_None,
+                           FW_KEY_NONE,
                            "Disable backface culling");
-    m_commonCtrl.addToggle((S32*)&m_cullMode, CullMode_CW, FW_KEY_NONE,
-                           "Cull clockwise faces");
-    m_commonCtrl.addToggle((S32*)&m_cullMode, CullMode_CCW, FW_KEY_NONE,
+    m_commonCtrl.addToggle(
+        (S32*)&m_cullMode, CullMode_CW, FW_KEY_NONE, "Cull clockwise faces");
+    m_commonCtrl.addToggle((S32*)&m_cullMode,
+                           CullMode_CCW,
+                           FW_KEY_NONE,
                            "Cull counter-clockwise faces");
-    m_commonCtrl.addButton((S32*)&m_action, Action_FlipTriangles, FW_KEY_NONE,
-                           "Flip triangles");
+    m_commonCtrl.addButton(
+        (S32*)&m_action, Action_FlipTriangles, FW_KEY_NONE, "Flip triangles");
     m_commonCtrl.addSeparator();
 
     //    m_commonCtrl.addButton((S32*)&m_action, Action_CleanMesh, FW_KEY_NONE,
@@ -113,42 +130,52 @@ App::App(std::vector<std::string>& cmd_args)
     m_settings.enable_reflections = true;
     m_normalMapped = false;
     m_filterTextures = false;
-    m_commonCtrl.addToggle(&(m_settings.use_textures), FW_KEY_NONE,
-                           "Use textures");
+    m_commonCtrl.addToggle(
+        &(m_settings.use_textures), FW_KEY_NONE, "Use textures");
     m_commonCtrl.addToggle(&m_normalMapped, FW_KEY_NONE, "Use normal mapping");
-    m_commonCtrl.addToggle(&m_filterTextures, FW_KEY_NONE,
-                           "Use trilinear texture filtering");
-    m_commonCtrl.addToggle(&(m_settings.use_arealights), FW_KEY_NONE,
-                           "Use area lights");
-    m_commonCtrl.addToggle(&(m_settings.enable_reflections), FW_KEY_NONE,
-                           "Enable reflections");
+    m_commonCtrl.addToggle(
+        &m_filterTextures, FW_KEY_NONE, "Use trilinear texture filtering");
+    m_commonCtrl.addToggle(
+        &(m_settings.use_arealights), FW_KEY_NONE, "Use area lights");
+    m_commonCtrl.addToggle(
+        &(m_settings.enable_reflections), FW_KEY_NONE, "Enable reflections");
     m_commonCtrl.addToggle(&(m_toneMap), FW_KEY_NONE, "Enable tone mapping");
     m_commonCtrl.addSeparator();
 
-    m_commonCtrl.addButton((S32*)&m_action, Action_TracePrimaryRays,
-                           FW_KEY_ENTER, "Trace Rays (ENTER)");
-    m_commonCtrl.addToggle(&m_showRTImage, FW_KEY_SPACE,
-                           "Show Ray Tracer result (SPACE)");
+    m_commonCtrl.addButton((S32*)&m_action,
+                           Action_TracePrimaryRays,
+                           FW_KEY_ENTER,
+                           "Trace Rays (ENTER)");
+    m_commonCtrl.addToggle(
+        &m_showRTImage, FW_KEY_SPACE, "Show Ray Tracer result (SPACE)");
 
     m_commonCtrl.addToggle((S32*)&m_shadingMode,
-                           Renderer::ShadingMode_Headlight, FW_KEY_F1,
+                           Renderer::ShadingMode_Headlight,
+                           FW_KEY_F1,
                            "Headlight shading (F1)");
     m_commonCtrl.addToggle((S32*)&m_shadingMode,
-                           Renderer::ShadingMode_AmbientOcclusion, FW_KEY_F2,
+                           Renderer::ShadingMode_AmbientOcclusion,
+                           FW_KEY_F2,
                            "Ambient occlusion shading (F2)");
-    m_commonCtrl.addToggle((S32*)&m_shadingMode, Renderer::ShadingMode_Whitted,
+    m_commonCtrl.addToggle((S32*)&m_shadingMode,
+                           Renderer::ShadingMode_Whitted,
                            FW_KEY_F3,
                            "Extra: shading using whitted integrator (F3)");
 
     m_commonCtrl.addSeparator();
 
     m_commonCtrl.beginSliderStack();
-    m_commonCtrl.addSlider(&m_numAARays, 1, 128, true, FW_KEY_NONE, FW_KEY_NONE,
-                           "AA rays= %d");
-    m_commonCtrl.addSlider(&m_numAORays, 1, 256, true, FW_KEY_NONE, FW_KEY_NONE,
-                           "AO rays= %d");
-    m_commonCtrl.addSlider(&m_aoRayLength, 0.1f, 10.0f, false, FW_KEY_NONE,
-                           FW_KEY_NONE, "AO ray length= %.2f");
+    m_commonCtrl.addSlider(
+        &m_numAARays, 1, 128, true, FW_KEY_NONE, FW_KEY_NONE, "AA rays= %d");
+    m_commonCtrl.addSlider(
+        &m_numAORays, 1, 256, true, FW_KEY_NONE, FW_KEY_NONE, "AO rays= %d");
+    m_commonCtrl.addSlider(&m_aoRayLength,
+                           0.1f,
+                           10.0f,
+                           false,
+                           FW_KEY_NONE,
+                           FW_KEY_NONE,
+                           "AO ray length= %.2f");
     m_commonCtrl.endSliderStack();
 
     m_window.addListener(this);
@@ -195,9 +222,11 @@ App::App(std::vector<std::string>& cmd_args)
         m_renderer->setNormalMapping(m_normalMapped);
         m_renderer->setTextureFiltering(m_filterTextures);
 
-        timingResult res = m_renderer->rayTracePicture(
-            m_rt.get(), m_rtImage.get(), m_cameraCtrl,
-            (Renderer::ShadingMode)m_shadingMode);
+        timingResult res =
+            m_renderer->rayTracePicture(m_rt.get(),
+                                        m_rtImage.get(),
+                                        m_cameraCtrl,
+                                        (Renderer::ShadingMode)m_shadingMode);
         m_RTTextureNeedsUpload = true;
 
         m_results.trace_time = res.duration;
@@ -242,9 +271,14 @@ int find_argument(std::string needle, std::vector<std::string> haystack) {
 void App::process_args(std::vector<std::string>& args) {
     // all of the possible cmd arguments and the corresponding enums (enum value
     // is the index of the string in the vector)
-    const std::vector<std::string> argument_names = {
-        "-builder", "-spp", "-output_images", "-use_textures", "-bat_render",
-        "-aa",      "-ao",  "-ao_length"};
+    const std::vector<std::string> argument_names = {"-builder",
+                                                     "-spp",
+                                                     "-output_images",
+                                                     "-use_textures",
+                                                     "-bat_render",
+                                                     "-aa",
+                                                     "-ao",
+                                                     "-ao_length"};
     enum argument {
         arg_not_found = -1,
         builder = 0,
@@ -536,7 +570,9 @@ bool App::handleEvent(const Window::Event& ev) {
                 m_renderer->setTextureFiltering(m_filterTextures);
 
                 m_renderer->rayTracePicture(
-                    m_rt.get(), m_rtImage.get(), m_cameraCtrl,
+                    m_rt.get(),
+                    m_rtImage.get(),
+                    m_cameraCtrl,
                     (Renderer::ShadingMode)m_shadingMode);
                 m_RTTextureNeedsUpload = true;
 
@@ -656,11 +692,13 @@ void App::renderFrame(GLContext* gl) {
             renderScene(gl, worldToCamera, projection);
         else {
             glDrawBuffer(GL_BACK_LEFT);
-            renderScene(gl, m_cameraCtrl.getCameraToLeftEye() * worldToCamera,
+            renderScene(gl,
+                        m_cameraCtrl.getCameraToLeftEye() * worldToCamera,
                         projection);
             glDrawBuffer(GL_BACK_RIGHT);
             glClear(GL_DEPTH_BUFFER_BIT);
-            renderScene(gl, m_cameraCtrl.getCameraToRightEye() * worldToCamera,
+            renderScene(gl,
+                        m_cameraCtrl.getCameraToRightEye() * worldToCamera,
                         projection);
             glDrawBuffer(GL_BACK);
         }
@@ -669,7 +707,8 @@ void App::renderFrame(GLContext* gl) {
 
         m_commonCtrl.message(
             sprintf("Triangles = %d, vertices = %d, materials = %d",
-                    m_mesh->numTriangles(), m_mesh->numVertices(),
+                    m_mesh->numTriangles(),
+                    m_mesh->numVertices(),
                     m_mesh->numSubmeshes()),
             "meshStats");
     }  // end GL draw code
@@ -677,7 +716,8 @@ void App::renderFrame(GLContext* gl) {
 
 //------------------------------------------------------------------------
 
-void App::renderScene(GLContext* gl, const Mat4f& worldToCamera,
+void App::renderScene(GLContext* gl,
+                      const Mat4f& worldToCamera,
                       const Mat4f& projection) {
     // Draw mesh.
     if (m_mesh) m_mesh->draw(gl, worldToCamera, projection);
@@ -685,8 +725,8 @@ void App::renderScene(GLContext* gl, const Mat4f& worldToCamera,
 
 //------------------------------------------------------------------------
 
-const static F32 posAttrib[] = {-1, -1, 0, 1, 1, -1, 0, 1,
-                                -1, 1,  0, 1, 1, 1,  0, 1};
+const static F32 posAttrib[] = {
+    -1, -1, 0, 1, 1, -1, 0, 1, -1, 1, 0, 1, 1, 1, 0, 1};
 
 const static F32 texAttrib[] = {0, 0, 1, 0, 0, 1, 1, 1};
 
@@ -701,14 +741,16 @@ void App::blitRttToScreen(GLContext* gl) {
     if (!prog) {
         prog = new GLContext::Program(
             FW_GL_SHADER_SOURCE(attribute vec4 posAttrib;
-                                attribute vec2 texAttrib; varying vec2 uv;
+                                attribute vec2 texAttrib;
+                                varying vec2 uv;
                                 void main() {
                                     gl_Position = posAttrib;
                                     uv = texAttrib;
                                 }),
             FW_GL_SHADER_SOURCE(
                 uniform sampler2D texSampler; varying vec2 uv;
-                uniform float reinhardLWhite; uniform float tonemapBoost;
+                uniform float reinhardLWhite;
+                uniform float tonemapBoost;
 
                 void main() {
                     vec3 color =
@@ -773,7 +815,8 @@ void App::loadMesh(const String& fileName) {
 
     if (restoreError(oldError)) {
         m_commonCtrl.message(sprintf("Error while loading '%s': %s",
-                                     fileName.getPtr(), newError.getPtr()));
+                                     fileName.getPtr(),
+                                     newError.getPtr()));
         return;
     }
 
@@ -807,7 +850,8 @@ void App::saveMesh(const String& fileName) {
 
     if (restoreError(oldError)) {
         m_commonCtrl.message(sprintf("Error while saving '%s': %s",
-                                     fileName.getPtr(), newError.getPtr()));
+                                     fileName.getPtr(),
+                                     newError.getPtr()));
         return;
     }
 
@@ -857,10 +901,12 @@ void App::constructTracer() {
     m_rt.reset(new RayTracer());
 
     // whether we want to try loading a saved hierarchy from disk
-    bool tryLoadHierarchy = false;
+    bool tryLoadHierarchy = true;
 
     // always construct when measuring performance
     if (m_settings.batch_render) tryLoadHierarchy = false;
+
+    bool constructed = false;
 
     if (tryLoadHierarchy) {
         // check if saved hierarchy exists
@@ -872,7 +918,7 @@ void App::constructTracer() {
         hierarchyName += "_x64";
 #endif
 
-        hierarchyName += ".hierarchy";
+        hierarchyName += "_custom.hierarchy";
 
         String hierarchyCacheFile = hierarchyName.c_str();
 
@@ -897,6 +943,7 @@ void App::constructTracer() {
             // .. and save!
             m_rt->saveHierarchy(hierarchyCacheFile.getPtr(), m_rtTriangles);
             ::printf("Saved hierarchy to %s\n", hierarchyCacheFile.getPtr());
+            constructed = true;
         }
     } else {
         // nope, bite the bullet and construct it
@@ -914,6 +961,23 @@ void App::constructTracer() {
                   frequency.QuadPart);  // Get timer result in milliseconds
         std::cout << "Build time: " << m_results.build_time << " ms"
                   << std::endl;
+        constructed = true;
+    }
+
+    // Save hierarchy
+    if (constructed) {
+        std::string meshName = m_meshFileName.getPtr();
+        std::string hierarchyName =
+            meshName.substr(0, meshName.find_last_of("."));
+#ifdef _WIN64
+        hierarchyName += "_x64";
+#endif
+
+        hierarchyName += "_custom.hierarchy";
+
+        String hierarchyCacheFile = hierarchyName.c_str();
+        m_rt->saveHierarchy(hierarchyName.c_str(), *(m_rt->m_triangles));
+        std::cout << "Saved hierarchy: " << hierarchyName << std::endl;
     }
 
     // m_rt is complete and mesh data will be constant from now on, so we can

@@ -82,7 +82,6 @@ void RayTracer::constructHierarchy(std::vector<RTTriangle>& triangles,
     buildBVH(triangles, bvh, bvh.root());
     m_bvh = bvh;
     m_triangles = &triangles;
-    saveHierarchy("test.hierarchy", *m_triangles);
 }
 
 AABB calculateAABB(const std::vector<RTTriangle>& triangles,
