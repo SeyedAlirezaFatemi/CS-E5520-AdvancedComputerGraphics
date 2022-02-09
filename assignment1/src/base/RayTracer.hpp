@@ -20,14 +20,17 @@ Mat3f formBasis(const Vec3f& n);
 Vec2f getTexelCoords(Vec2f uv, const Vec2i size);
 
 AABB calculateAABB(const std::vector<RTTriangle>& triangles,
-                   const std::vector<uint32_t>& indices, const size_t start,
+                   const std::vector<uint32_t>& indices,
+                   const size_t start,
                    const size_t end);
 
 AABB calculateCentroidAABB(const std::vector<RTTriangle>& triangles,
                            const std::vector<uint32_t>& indices,
-                           const size_t start, const size_t end);
+                           const size_t start,
+                           const size_t end);
 
-void buildBVH(const std::vector<RTTriangle>& triangles, Bvh& bvh,
+void buildBVH(const std::vector<RTTriangle>& triangles,
+              Bvh& bvh,
               BvhNode& node);
 
 // Main class for tracing rays using BVHs.
@@ -60,8 +63,11 @@ class RayTracer {
     Bvh m_bvh;
 
     std::tuple<int, float, float, float> RayTracer::intersectBVH(
-        const BvhNode& node, const Vec3f& orig, const Vec3f& dir,
-        const Vec3f& invDir, float tmin) const;
+        const BvhNode& node,
+        const Vec3f& orig,
+        const Vec3f& dir,
+        const Vec3f& invDir,
+        float tmin) const;
 };
 
 }  // namespace FW

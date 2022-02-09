@@ -38,7 +38,8 @@ Mat3f formBasis(const Vec3f& n) {
 
 String RayTracer::computeMD5(const std::vector<Vec3f>& vertices) {
     unsigned char digest[16];
-    MD5Buffer((void*)&vertices[0], sizeof(Vec3f) * vertices.size(),
+    MD5Buffer((void*)&vertices[0],
+              sizeof(Vec3f) * vertices.size(),
               (unsigned int*)digest);
 
     // turn into string
@@ -85,8 +86,10 @@ void RayTracer::constructHierarchy(std::vector<RTTriangle>& triangles,
 }
 
 AABB calculateAABB(const std::vector<RTTriangle>& triangles,
-                   const std::vector<uint32_t>& indices, const size_t start,
+                   const std::vector<uint32_t>& indices,
+                   const size_t start,
                    const size_t end) {
+    // Be careful how you index the triangles vector.
     AABB result{triangles[indices[start]].min(),
                 triangles[indices[start]].max()};
     for (size_t i = start; i < end; i++) {
@@ -100,7 +103,9 @@ AABB calculateAABB(const std::vector<RTTriangle>& triangles,
 
 AABB calculateCentroidAABB(const std::vector<RTTriangle>& triangles,
                            const std::vector<uint32_t>& indices,
-                           const size_t start, const size_t end) {
+                           const size_t start,
+                           const size_t end) {
+    // Be careful how you index the triangles vector.
     AABB result{triangles[indices[start]].centroid(),
                 triangles[indices[start]].centroid()};
     for (size_t i = start; i < end; i++) {
@@ -112,17 +117,18 @@ AABB calculateCentroidAABB(const std::vector<RTTriangle>& triangles,
     return result;
 }
 
-void buildBVH(const std::vector<RTTriangle>& triangles, Bvh& bvh,
+void buildBVH(const std::vector<RTTriangle>& triangles,
+              Bvh& bvh,
               BvhNode& node) {
+    // Don't split this node if it has less than 10 triangles.
+    if (node.endPrim - node.startPrim < 10) return;
     // Note that the spatial median split plane should be based on an AABB
     // spanned by the centroids instead of the actual AABB of the node to ensure
     // an actual split.
-    // Don't split this node if it has less than 100 triangles
-    if (node.endPrim - node.startPrim < 10) return;
     // Calculate centroid AABB of nodes
-    const auto bb = calculateCentroidAABB(triangles, bvh.indices(),
-                                          node.startPrim, node.endPrim);
-    // Calculate longestAxisIndex
+    const auto bb = calculateCentroidAABB(
+        triangles, bvh.indices(), node.startPrim, node.endPrim);
+    // Find the longest axis
     auto diagonal = bb.max - bb.min;
     size_t longestAxisIndex = 0;
     if (diagonal.z > diagonal.get(longestAxisIndex)) {
@@ -136,30 +142,32 @@ void buildBVH(const std::vector<RTTriangle>& triangles, Bvh& bvh,
     // Partition
     auto& indices = bvh.indices();
     auto iter = std::partition(
-        indices.begin() + node.startPrim, indices.begin() + node.endPrim,
+        indices.begin() + node.startPrim,
+        indices.begin() + node.endPrim,
         [longestAxisIndex, axisCenter, &triangles](const size_t& nodeIndex) {
             return triangles[nodeIndex].centroid().get(longestAxisIndex) <
                    axisCenter;
         });
     auto partitionIndex = iter - indices.begin();
-    // Make two nodes
+    // Construct two new nodes
     node.right = std::make_unique<BvhNode>(node.startPrim, partitionIndex);
     node.left = std::make_unique<BvhNode>(partitionIndex, node.endPrim);
     // Calculate the AABB of the nodes
-    node.right->bb = calculateAABB(triangles, bvh.indices(),
-                                   node.right->startPrim, node.right->endPrim);
-    node.left->bb = calculateAABB(triangles, bvh.indices(),
-                                  node.left->startPrim, node.left->endPrim);
+    node.right->bb = calculateAABB(
+        triangles, bvh.indices(), node.right->startPrim, node.right->endPrim);
+    node.left->bb = calculateAABB(
+        triangles, bvh.indices(), node.left->startPrim, node.left->endPrim);
     // Recursion
     buildBVH(triangles, bvh, *(node.right));
     buildBVH(triangles, bvh, *(node.left));
-
-    return;
 }
 
 std::tuple<int, float, float, float> RayTracer::intersectBVH(
-    const BvhNode& node, const Vec3f& orig, const Vec3f& dir,
-    const Vec3f& invDir, float tmin) const {
+    const BvhNode& node,
+    const Vec3f& orig,
+    const Vec3f& dir,
+    const Vec3f& invDir,
+    float tmin) const {
     if (node.right == nullptr) {  // Leaf node
         float umin = 0.0f, vmin = 0.0f;
         int imin = -1;
@@ -188,18 +196,9 @@ std::tuple<int, float, float, float> RayTracer::intersectBVH(
     if (!didHitLeft && !didHitRight) {
         return std::make_tuple(-1, 0.0, 0.0, 0.0);
     }
-    // int triangleIndex = -1;
-    // float tfirst = 0.0;
     bool firstRight = didHitRight && (!didHitLeft || tleft > tright);
     const BvhNode& firstNode = firstRight ? *(node.right) : *(node.left);
     const float tBoundOther = firstRight ? tleft : tright;
-    // if (firstRight) {
-    //     auto firstIntersectioinResult =
-    //         intersectBVH(*(node.right), orig, dir, invDir, tmin);
-    // } else {
-    //     auto firstIntersectioinResult =
-    //         intersectBVH(*(node.left), orig, dir, invDir, tmin);
-    // }
     auto firstIntersectioinResult =
         intersectBVH(firstNode, orig, dir, invDir, tmin);
     int firstTriangleIndex = std::get<0>(firstIntersectioinResult);
@@ -252,7 +251,6 @@ RaycastResult RayTracer::raycast(const Vec3f& orig, const Vec3f& dir) const {
     // change the range of the loop to match the elements the leaf covers.)
     float tmin = 1.0f, umin = 0.0f, vmin = 0.0f;
     int imin = -1;
-    float t_hit = std::numeric_limits<float>::max();
     // Check if hits the scene then start the recursive call
 
     RaycastResult castresult;
@@ -280,8 +278,13 @@ RaycastResult RayTracer::raycast(const Vec3f& orig, const Vec3f& dir) const {
     }
 
     if (imin != -1)
-        castresult = RaycastResult(&(*m_triangles)[imin], tmin, umin, vmin,
-                                   orig + tmin * dir, orig, dir);
+        castresult = RaycastResult(&(*m_triangles)[imin],
+                                   tmin,
+                                   umin,
+                                   vmin,
+                                   orig + tmin * dir,
+                                   orig,
+                                   dir);
 
     return castresult;
 }
