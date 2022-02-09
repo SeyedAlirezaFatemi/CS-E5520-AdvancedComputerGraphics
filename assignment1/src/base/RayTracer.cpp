@@ -179,51 +179,51 @@ std::tuple<int, float, float, float> RayTracer::intersectBVH(
         return std::make_tuple(imin, tmin, umin, vmin);
     };
 
-    std::vector<std::tuple<BvhNode&, float>> nodesToCheck;
     auto rightResult = node.right->bb.intersect(orig, dir, invDir, 0.0f);
-    bool didHitRight = std::get<0>(rightResult);
     float tright = std::get<1>(rightResult);
-
-    if (didHitRight && tright < tmin)
-        nodesToCheck.emplace_back(*(node.right), tright);
+    bool didHitRight = std::get<0>(rightResult) && tright < tmin;
     auto leftResult = node.left->bb.intersect(orig, dir, invDir, 0.0f);
-    bool didHitLeft = std::get<0>(leftResult);
     float tleft = std::get<1>(leftResult);
-    if (didHitLeft && tleft < tmin)
-        nodesToCheck.emplace_back(*(node.left), tleft);
-
-    if (nodesToCheck.empty()) {
-        return std::make_tuple(-1, 0.0f, 0.0f, 0.0f);
+    bool didHitLeft = std::get<0>(leftResult) && tleft < tmin;
+    if (!didHitLeft && !didHitRight) {
+        return std::make_tuple(-1, 0.0, 0.0, 0.0);
     }
-    if (nodesToCheck.size() == 2 &&
-        std::get<1>(nodesToCheck[0]) > std::get<1>(nodesToCheck[1])) {
-        auto tmp0 = nodesToCheck[0];
-        auto tmp1 = nodesToCheck[1];
-        nodesToCheck.clear();
-        nodesToCheck.push_back(tmp1);
-        nodesToCheck.push_back(tmp0);
-    }
-    // We have already compared tstart of nodes with tmin here.
-    int triangleIndex = -1;
+    // int triangleIndex = -1;
+    // float tfirst = 0.0;
+    bool firstRight = didHitRight && (!didHitLeft || tleft > tright);
+    const BvhNode& firstNode = firstRight ? *(node.right) : *(node.left);
+    const float tBoundOther = firstRight ? tleft : tright;
+    // if (firstRight) {
+    //     auto firstIntersectioinResult =
+    //         intersectBVH(*(node.right), orig, dir, invDir, tmin);
+    // } else {
+    //     auto firstIntersectioinResult =
+    //         intersectBVH(*(node.left), orig, dir, invDir, tmin);
+    // }
     auto firstIntersectioinResult =
-        intersectBVH(std::get<0>(nodesToCheck[0]), orig, dir, invDir, tmin);
-    triangleIndex = std::get<0>(firstIntersectioinResult);
+        intersectBVH(firstNode, orig, dir, invDir, tmin);
+    int firstTriangleIndex = std::get<0>(firstIntersectioinResult);
     float tfirst = std::get<1>(firstIntersectioinResult);
-    if (triangleIndex != -1) {
-        if (nodesToCheck.size() == 2 && tfirst < std::get<1>(nodesToCheck[1])) {
-            // No need to check the other node. Either the ray didn't hit that
-            // node or it did but the tstart is bigger than tfirst.
-            return firstIntersectioinResult;
-        }
-        // Update tmin
-        if (tfirst < tmin) tmin = tfirst;
-    }
-    if (nodesToCheck.size() == 1) {
+    if ((firstRight && !didHitLeft) || (!firstRight && !didHitRight)) {
+        // No other node to check
         return firstIntersectioinResult;
     }
-
+    if (firstTriangleIndex != -1) {
+        // Update tmin
+        if (tfirst < tmin) {
+            tmin = tfirst;
+            // This is very important for performance.
+            if (tmin < tBoundOther) {
+                return firstIntersectioinResult;
+            }
+        }
+    }
+    const BvhNode& otherNode = firstRight ? *(node.left) : *(node.right);
     auto otherIntersectioinResult =
-        intersectBVH(std::get<0>(nodesToCheck[1]), orig, dir, invDir, tmin);
+        intersectBVH(otherNode, orig, dir, invDir, tmin);
+    if (firstTriangleIndex == -1) {
+        return otherIntersectioinResult;
+    }
     int otherTriangleIndex = std::get<0>(otherIntersectioinResult);
     if (otherTriangleIndex != -1) {
         float tother = std::get<1>(otherIntersectioinResult);
