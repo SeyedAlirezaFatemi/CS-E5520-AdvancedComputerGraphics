@@ -206,15 +206,36 @@ Vec4f Renderer::computeShadingHeadlight(const RaycastResult& hit,
     return Vec4f(shade * diffuse, 1.0f);
 }
 
+Vec3f getRandomPointHalfSphere(Random& rnd) {
+    float x, y,
+        sumSquares = 2.0f;  // Initialize with 2.0f so we enter the while loop
+    while (sumSquares > 1) {
+        x = rnd.getF32(-1, 1);
+        y = rnd.getF32(-1, 1);
+        sumSquares = FW::pow(x, 2) + FW::pow(y, 2);
+    }
+    return Vec3f(x, y, FW::sqrt(1 - sumSquares));
+}
+
 Vec4f Renderer::computeShadingAmbientOcclusion(RayTracer* rt,
                                                const RaycastResult& hit,
                                                const CameraControls& cameraCtrl,
                                                Random& rnd) {
-    Vec4f color;
-
     // YOUR CODE HERE (R4)
+    float eps = 1e-4;
+    Vec3f n(hit.tri->normal());
+    //  Nudge the hit point very slightly (say, 0.001 units) towards the camera
+    Vec3f origin =
+        hit.point - eps * FW::normalize(hit.dir);  // cameraCtrl.getPosition();
+    auto basis = formBasis(n);
+    float numHits{0.0f};
+    for (size_t i = 0; i < m_aoNumRays; i++) {
+        auto randDirection = basis * getRandomPointHalfSphere(rnd);
+        if (rt->raycast(origin, m_aoRayLength * randDirection).tri != nullptr)
+            numHits++;
+    }
 
-    return color;
+    return Vec4f(1 - numHits / m_aoNumRays);
 }
 
 Vec4f Renderer::computeShadingWhitted(RayTracer* rt,

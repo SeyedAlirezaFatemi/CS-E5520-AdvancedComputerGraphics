@@ -30,13 +30,25 @@ Vec2f getTexelCoords(Vec2f uv, const Vec2i size) {
     // scale the coordinates by image resolution and find the nearest pixel.
     uv[0] = uv[0] - FW::floor(uv[0]);
     uv[1] = uv[1] - FW::floor(uv[1]);
-    // std::cout << uv[0] << " " << uv[1] << "\n";
     return uv * Vec2f(size);
+}
+
+inline F32& minabscoord(Vec3f& v) {
+    return FW::filtcoord(
+        v, [](float a, float b) { return FW::abs(a) < FW::abs(b); });
 }
 
 Mat3f formBasis(const Vec3f& n) {
     // YOUR CODE HERE (R4):
-    return Mat3f();
+    Vec3f q{n};
+    minabscoord(q) = 1;
+    Vec3f t{FW::cross(q, n)};
+    Vec3f b{FW::cross(t, n)};
+    Mat3f result;
+    result.setCol(0, t);
+    result.setCol(1, b);
+    result.setCol(2, n);
+    return result;
 }
 
 String RayTracer::computeMD5(const std::vector<Vec3f>& vertices) {
@@ -251,6 +263,7 @@ RaycastResult RayTracer::raycast(const Vec3f& orig, const Vec3f& dir) const {
 
     // You can use this existing code for leaf nodes of the BVH (you do want to
     // change the range of the loop to match the elements the leaf covers.)
+    // Note: tmin should be initialized with 1.0f
     float tmin = 1.0f, umin = 0.0f, vmin = 0.0f;
     int imin = -1;
     // Check if hits the scene then start the recursive call
