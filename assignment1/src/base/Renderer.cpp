@@ -151,7 +151,10 @@ void Renderer::getTextureParameters(const RaycastResult& hit,
     // the vertex texture coordinates hit.tri->m_vertices[i].t of the
     // intersected triangle, compute the uv coordinate of the intersection
     // point.
-    Vec2f uv = Vec2f(.0f);
+    Vec2f uv{(1.0f - (hit.u + hit.v)) * hit.tri->m_vertices[0].t +
+             hit.u * hit.tri->m_vertices[1].t +
+             hit.v * hit.tri->m_vertices[2].t};
+
     Texture& diffuseTex =
         mat->textures
             [MeshBase::TextureType_Diffuse];  // note: you can fetch other kinds
@@ -167,8 +170,8 @@ void Renderer::getTextureParameters(const RaycastResult& hit,
         Vec2i texelCoords = getTexelCoords(uv, img.getSize());
 
         // YOUR CODE HERE (R3): uncomment the line below once you have
-        // implemented getTexelCoords. diffuse =
-        // img.getVec4f(texelCoords).getXYZ();
+        // implemented getTexelCoords.
+        diffuse = img.getVec4f(texelCoords).getXYZ();
     }
     Texture& normalTex = mat->textures[MeshBase::TextureType_Normal];
     if (normalTex.exists() &&

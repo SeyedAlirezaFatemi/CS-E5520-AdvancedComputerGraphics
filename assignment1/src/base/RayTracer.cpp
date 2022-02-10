@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <limits>
 #include <numeric>
@@ -27,8 +28,10 @@ Vec2f getTexelCoords(Vec2f uv, const Vec2i size) {
     // UV coordinates range from negative to positive infinity. First map them
     // to a range between 0 and 1 in order to support tiling textures, then
     // scale the coordinates by image resolution and find the nearest pixel.
-
-    return Vec2f();
+    uv[0] = uv[0] - FW::floor(uv[0]);
+    uv[1] = uv[1] - FW::floor(uv[1]);
+    // std::cout << uv[0] << " " << uv[1] << "\n";
+    return uv * Vec2f(size);
 }
 
 Mat3f formBasis(const Vec3f& n) {
