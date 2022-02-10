@@ -30,7 +30,8 @@ void Renderer::gatherLightTriangles(RayTracer* rt) {
     }
 }
 
-timingResult Renderer::rayTracePicture(RayTracer* rt, Image* image,
+timingResult Renderer::rayTracePicture(RayTracer* rt,
+                                       Image* image,
                                        const CameraControls& cameraCtrl,
                                        ShadingMode mode) {
     // measure time to render
@@ -62,10 +63,10 @@ timingResult Renderer::rayTracePicture(RayTracer* rt, Image* image,
         for (int i = 0; i < width; i++)
             image->setVec4f(Vec2i(i, j), Vec4f(.0f));  // initialize image to 0
 
-    // YOUR CODE HERE(R5):
-    // remove this to enable multithreading (you also need to enable it in the
-    // project properties: C++/Language/Open MP support)
-    #pragma omp parallel for
+// YOUR CODE HERE(R5):
+// remove this to enable multithreading (you also need to enable it in the
+// project properties: C++/Language/Open MP support)
+#pragma omp parallel for
     for (int j = 0; j < height; ++j) {
         // Each thread must have its own random generator
         Random rnd;
@@ -104,8 +105,8 @@ timingResult Renderer::rayTracePicture(RayTracer* rt, Image* image,
                         color = computeShadingHeadlight(hit, cameraCtrl);
                         break;
                     case ShadingMode_AmbientOcclusion:
-                        color = computeShadingAmbientOcclusion(rt, hit,
-                                                               cameraCtrl, rnd);
+                        color = computeShadingAmbientOcclusion(
+                            rt, hit, cameraCtrl, rnd);
                         break;
                     case ShadingMode_Whitted:
                         color =
@@ -140,8 +141,10 @@ timingResult Renderer::rayTracePicture(RayTracer* rt, Image* image,
     return result;
 }
 
-void Renderer::getTextureParameters(const RaycastResult& hit, Vec3f& diffuse,
-                                    Vec3f& n, Vec3f& specular) {
+void Renderer::getTextureParameters(const RaycastResult& hit,
+                                    Vec3f& diffuse,
+                                    Vec3f& n,
+                                    Vec3f& specular) {
     MeshBase::Material* mat = hit.tri->m_material;
     // YOUR CODE HERE (R3):
     // using the barycentric coordinates of the intersection (hit.u, hit.v) and
@@ -211,9 +214,11 @@ Vec4f Renderer::computeShadingAmbientOcclusion(RayTracer* rt,
     return color;
 }
 
-Vec4f Renderer::computeShadingWhitted(RayTracer* rt, const RaycastResult& hit,
+Vec4f Renderer::computeShadingWhitted(RayTracer* rt,
+                                      const RaycastResult& hit,
                                       const CameraControls& cameraCtrl,
-                                      Random& rnd, int num_bounces) {
+                                      Random& rnd,
+                                      int num_bounces) {
     // EXTRA: implement a whitted integrator
     return Vec4f(.0f);
 }
