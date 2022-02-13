@@ -105,7 +105,7 @@ timingResult Renderer::rayTracePicture(RayTracer* rt,
                 Rd = Rd - Ro;
 
                 // trace!
-                RaycastResult hit = rt->raycast(Ro, Rd);
+                RaycastResult hit = rt->raycast(Ro, Rd, m_useTextures);
 
                 // if we hit something, fetch a color and insert into image
 
@@ -292,7 +292,7 @@ Vec4f Renderer::computeShadingAmbientOcclusion(RayTracer* rt,
     float numHits{0.0f};
     for (size_t i = 0; i < m_aoNumRays; i++) {
         auto randDirection = basis * getRandomPointHalfSphere(rnd);
-        if (rt->raycast(origin, m_aoRayLength * randDirection).tri != nullptr)
+        if (rt->raycast(origin, m_aoRayLength * randDirection, m_useTextures).tri != nullptr)
             numHits++;
     }
 

@@ -31,7 +31,8 @@ AABB calculateCentroidAABB(const std::vector<RTTriangle>& triangles,
 
 void buildBVH(const std::vector<RTTriangle>& triangles,
               Bvh& bvh,
-              BvhNode& node);
+              BvhNode& node,
+              SplitMode splitMode);
 
 // Main class for tracing rays using BVHs.
 class RayTracer {
@@ -47,7 +48,7 @@ class RayTracer {
     void loadHierarchy(const char* filename,
                        std::vector<RTTriangle>& triangles);
 
-    RaycastResult raycast(const Vec3f& orig, const Vec3f& dir) const;
+    RaycastResult raycast(const Vec3f& orig, const Vec3f& dir, bool useTextures) const;
 
     // This function computes an MD5 checksum of the input scene data,
     // WITH the assumption that all vertices are allocated in one big chunk.
@@ -67,7 +68,8 @@ class RayTracer {
         const Vec3f& orig,
         const Vec3f& dir,
         const Vec3f& invDir,
-        float tmin) const;
+        float tmin,
+        bool useTextures) const;
 };
 
 }  // namespace FW

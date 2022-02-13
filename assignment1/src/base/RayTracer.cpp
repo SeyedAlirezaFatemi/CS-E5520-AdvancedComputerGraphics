@@ -34,8 +34,7 @@ Vec2f getTexelCoords(Vec2f uv, const Vec2i size) {
 }
 
 inline F32& minabscoord(Vec3f& v) {
-    return FW::filtcoord(
-        v, [](float a, float b) { return FW::abs(a) < FW::abs(b); });
+    return FW::filtcoord(v, [](float a, float b) { return FW::abs(a) < FW::abs(b); });
 }
 
 Mat3f formBasis(const Vec3f& n) {
@@ -53,9 +52,7 @@ Mat3f formBasis(const Vec3f& n) {
 
 String RayTracer::computeMD5(const std::vector<Vec3f>& vertices) {
     unsigned char digest[16];
-    MD5Buffer((void*)&vertices[0],
-              sizeof(Vec3f) * vertices.size(),
-              (unsigned int*)digest);
+    MD5Buffer((void*)&vertices[0], sizeof(Vec3f) * vertices.size(), (unsigned int*)digest);
 
     // turn into string
     char ad[33];
@@ -71,30 +68,27 @@ RayTracer::RayTracer() {}
 
 RayTracer::~RayTracer() {}
 
-void RayTracer::loadHierarchy(const char* filename,
-                              std::vector<RTTriangle>& triangles) {
+void RayTracer::loadHierarchy(const char* filename, std::vector<RTTriangle>& triangles) {
     std::ifstream ifs(filename, std::ios::binary);
     m_bvh = Bvh(ifs);
 
     m_triangles = &triangles;
 }
 
-void RayTracer::saveHierarchy(const char* filename,
-                              const std::vector<RTTriangle>& triangles) {
+void RayTracer::saveHierarchy(const char* filename, const std::vector<RTTriangle>& triangles) {
     (void)triangles;  // Not used.
 
     std::ofstream ofs(filename, std::ios::binary);
     m_bvh.save(ofs);
 }
 
-void RayTracer::constructHierarchy(std::vector<RTTriangle>& triangles,
-                                   SplitMode splitMode) {
+void RayTracer::constructHierarchy(std::vector<RTTriangle>& triangles, SplitMode splitMode) {
     // YOUR CODE HERE (R1):
     // This is where you should construct your BVH.
     Bvh bvh{splitMode, triangles.size()};
     auto rootAABB{calculateAABB(triangles, bvh.indices(), 0, triangles.size())};
     bvh.root().bb = rootAABB;
-    buildBVH(triangles, bvh, bvh.root());
+    buildBVH(triangles, bvh, bvh.root(), splitMode);
     m_bvh = bvh;
     m_triangles = &triangles;
 }
@@ -104,8 +98,7 @@ AABB calculateAABB(const std::vector<RTTriangle>& triangles,
                    const size_t start,
                    const size_t end) {
     // Be careful how you index the triangles vector.
-    AABB result{triangles[indices[start]].min(),
-                triangles[indices[start]].max()};
+    AABB result{triangles[indices[start]].min(), triangles[indices[start]].max()};
     for (size_t i = start; i < end; i++) {
         const auto& triangleIndex = indices[i];
         const auto& triangle = triangles[triangleIndex];
@@ -120,8 +113,7 @@ AABB calculateCentroidAABB(const std::vector<RTTriangle>& triangles,
                            const size_t start,
                            const size_t end) {
     // Be careful how you index the triangles vector.
-    AABB result{triangles[indices[start]].centroid(),
-                triangles[indices[start]].centroid()};
+    AABB result{triangles[indices[start]].centroid(), triangles[indices[start]].centroid()};
     for (size_t i = start; i < end; i++) {
         const auto& triangleIndex = indices[i];
         const auto& triangle = triangles[triangleIndex];
@@ -131,57 +123,173 @@ AABB calculateCentroidAABB(const std::vector<RTTriangle>& triangles,
     return result;
 }
 
+int binarySearch(const std::vector<float>& a, float target) {
+    int l = 0, r = (int)a.size() - 1, mid, ans = -1;
+    while (l <= r) {
+        mid = l + (r - l) / 2;
+        if (a[mid] == target) return mid;
+        if (a[mid] < target) {
+            l = mid + 1;
+            ans = mid + 1;
+        } else {
+            ans = mid;
+            r = mid - 1;
+        }
+    }
+    return ans;
+}
+
 void buildBVH(const std::vector<RTTriangle>& triangles,
               Bvh& bvh,
-              BvhNode& node) {
+              BvhNode& node,
+              SplitMode splitMode) {
+    static const int numIntervals = 8;  // For SplitMode_Sah
     // Don't split this node if it has less than 10 triangles.
     if (node.endPrim - node.startPrim < 10) return;
-    // Note that the spatial median split plane should be based on an AABB
-    // spanned by the centroids instead of the actual AABB of the node to ensure
-    // an actual split.
-    // Calculate centroid AABB of nodes
-    const auto bb = calculateCentroidAABB(
-        triangles, bvh.indices(), node.startPrim, node.endPrim);
-    // Find the longest axis
-    auto diagonal = bb.max - bb.min;
-    size_t longestAxisIndex = 0;
-    if (diagonal.z > diagonal.get(longestAxisIndex)) {
-        longestAxisIndex = 2;
-    }
-    if (diagonal.y > diagonal.get(longestAxisIndex)) {
-        longestAxisIndex = 1;
-    }
-    auto axisCenter =
-        0.5 * (bb.max.get(longestAxisIndex) + bb.min.get(longestAxisIndex));
-    // Partition
+    int partitionIndex;
     auto& indices = bvh.indices();
-    auto iter = std::partition(
-        indices.begin() + node.startPrim,
-        indices.begin() + node.endPrim,
-        [longestAxisIndex, axisCenter, &triangles](const size_t& nodeIndex) {
-            return triangles[nodeIndex].centroid().get(longestAxisIndex) <
-                   axisCenter;
-        });
-    auto partitionIndex = iter - indices.begin();
+    bool sahOK = false;
+    if (splitMode == SplitMode_Sah) {
+        auto diagonal = node.bb.max - node.bb.min;
+        std::vector<std::vector<AABB>> leftBoundingBoxes;
+        std::vector<std::vector<AABB>> rightBoundingBoxes;
+        std::vector<std::vector<int>> leftNumTriangles;
+        std::vector<std::vector<int>> rightNumTriangles;
+        std::vector<std::vector<float>> partitionEnds{{}, {}, {}};
+        for (size_t axis = 0; axis < 3; axis++) {
+            // Add a vector of zeros
+            leftNumTriangles.emplace_back(numIntervals - 1, 0);
+            rightNumTriangles.emplace_back(numIntervals - 1, 0);
+            partitionEnds[axis].reserve(numIntervals - 1);
+            // Add empty vectors
+            leftBoundingBoxes.emplace_back();
+            rightBoundingBoxes.emplace_back();
+            float intervalLength = diagonal.get(axis) / static_cast<float>(numIntervals);
+            for (size_t intervalIndex = 1; intervalIndex < numIntervals; intervalIndex++) {
+                partitionEnds[axis].push_back(node.bb.min.get(axis) +
+                                              intervalIndex * intervalLength);
+            }
+            // numIntervals - 1 options for possible bounding boxes
+            for (size_t i = 0; i < numIntervals - 1; i++) {
+                leftBoundingBoxes[axis].emplace_back(Vec3f(std::numeric_limits<float>::max()),
+                                                     Vec3f(-std::numeric_limits<float>::max()));
+                rightBoundingBoxes[axis].emplace_back(Vec3f(std::numeric_limits<float>::max()),
+                                                      Vec3f(-std::numeric_limits<float>::max()));
+            }
+        }
+        // Distribute the triangles between intervals
+        // TODO: Add more comments.
+        for (size_t i = node.startPrim; i < node.endPrim; i++) {
+            const auto& triangle = triangles[bvh.getIndex(i)];
+            const auto triangleCentroid = triangle.centroid();
+            for (size_t axis = 0; axis < 3; axis++) {
+                /*
+                min            max
+                '  '  '  '  '  '
+                0  1  2  3  4  5
+                  0  1  2  3  4    Left
+                  4  3  2  1  0    Right
+                */
+                int insertionIdx =
+                    binarySearch(partitionEnds[axis], triangleCentroid.get(axis));  // 0 -> 4
+                // 0 1 2 3 -4-
+                for (int i = insertionIdx; i < numIntervals - 1; i++) {
+                    leftBoundingBoxes[axis][i].unionWith(triangle);
+                    leftNumTriangles[axis][i]++;
+                }
+                // -4- 3 2 1 0
+                for (int i = numIntervals - insertionIdx - 1; i < numIntervals - 1; i++) {
+                    rightBoundingBoxes[axis][i].unionWith(triangle);
+                    rightNumTriangles[axis][i]++;
+                }
+            }
+        }
+        // Find the best
+        int bestAxis = 0, leftNum, rightNum;
+        float partitionPoint;
+        float bestScore = std::numeric_limits<float>::max();
+        float score;
+        std::vector<float> scores;
+        for (size_t axis = 0; axis < 3; axis++) {
+            float leftArea, rightArea;
+            for (size_t intervalIndex = 0; intervalIndex < numIntervals - 1; intervalIndex++) {
+                leftNum = leftNumTriangles[axis][intervalIndex];
+                rightNum = rightNumTriangles[axis][numIntervals - intervalIndex - 1 - 1];
+                if (leftNum == 0 || rightNum == 0) {
+                    continue;
+                }
+                leftArea = leftBoundingBoxes[axis][intervalIndex].area();
+                rightArea = rightBoundingBoxes[axis][numIntervals - intervalIndex - 1 - 1].area();
+                sahOK = true;
+                score = leftArea * leftNum + rightArea * rightNum;
+                scores.push_back(score);
+                if (score < bestScore) {
+                    bestScore = score;
+                    bestAxis = axis;
+                    partitionPoint = partitionEnds[axis][intervalIndex];
+                }
+            }
+        }
+        if (sahOK) {
+            auto iter = std::partition(
+                indices.begin() + node.startPrim,
+                indices.begin() + node.endPrim,
+                [bestAxis, partitionPoint, &triangles](const size_t& triangleIndex) {
+                    // Cruicial to have <= instead of <.
+                    return triangles[triangleIndex].centroid().get(bestAxis) <= partitionPoint;
+                });
+            partitionIndex = iter - indices.begin();
+
+            // TODO: Improve.
+            if (partitionIndex - node.startPrim == 0) {
+                std::cout << "Left size: " << node.endPrim - partitionIndex << "\n";
+            }
+        }
+    }
+    if (!sahOK || splitMode != SplitMode_Sah) {
+        // SplitMode_SpatialMedian
+        // Note that the spatial median split plane should be based on an AABB
+        // spanned by the centroids instead of the actual AABB of the node to
+        // ensure an actual split. Calculate centroid AABB of nodes
+        const auto bb =
+            calculateCentroidAABB(triangles, bvh.indices(), node.startPrim, node.endPrim);
+        // Find the longest axis
+        auto diagonal = bb.max - bb.min;
+        size_t longestAxisIndex = 0;
+        if (diagonal.z > diagonal.get(longestAxisIndex)) {
+            longestAxisIndex = 2;
+        }
+        if (diagonal.y > diagonal.get(longestAxisIndex)) {
+            longestAxisIndex = 1;
+        }
+        auto axisCenter = 0.5 * (bb.max.get(longestAxisIndex) + bb.min.get(longestAxisIndex));
+        // Partition
+        auto iter = std::partition(
+            indices.begin() + node.startPrim,
+            indices.begin() + node.endPrim,
+            [longestAxisIndex, axisCenter, &triangles](const size_t& triangleIndex) {
+                return triangles[triangleIndex].centroid().get(longestAxisIndex) < axisCenter;
+            });
+        partitionIndex = iter - indices.begin();
+    }
     // Construct two new nodes
     node.right = std::make_unique<BvhNode>(node.startPrim, partitionIndex);
     node.left = std::make_unique<BvhNode>(partitionIndex, node.endPrim);
     // Calculate the AABB of the nodes
-    node.right->bb = calculateAABB(
-        triangles, bvh.indices(), node.right->startPrim, node.right->endPrim);
-    node.left->bb = calculateAABB(
-        triangles, bvh.indices(), node.left->startPrim, node.left->endPrim);
+    node.right->bb =
+        calculateAABB(triangles, bvh.indices(), node.right->startPrim, node.right->endPrim);
+    node.left->bb =
+        calculateAABB(triangles, bvh.indices(), node.left->startPrim, node.left->endPrim);
     // Recursion
-    buildBVH(triangles, bvh, *(node.right));
-    buildBVH(triangles, bvh, *(node.left));
+    buildBVH(triangles, bvh, *(node.right), splitMode);
+    buildBVH(triangles, bvh, *(node.left), splitMode);
 }
 
 float getAlpha(const RTTriangle& triangle, float u, float v) {
-    Texture& alphaTex =
-        triangle.m_material->textures[MeshBase::TextureType_Alpha];
+    Texture& alphaTex = triangle.m_material->textures[MeshBase::TextureType_Alpha];
     if (alphaTex.exists()) {
-        Vec2f uv{(1.0f - (u + v)) * triangle.m_vertices[0].t +
-                 u * triangle.m_vertices[1].t + v * triangle.m_vertices[2].t};
+        Vec2f uv{(1.0f - (u + v)) * triangle.m_vertices[0].t + u * triangle.m_vertices[1].t +
+                 v * triangle.m_vertices[2].t};
         const Image& img = *alphaTex.getImage();
         Vec2i texelCoords = getTexelCoords(uv, img.getSize());
         return img.getVec4f(texelCoords).get(0);
@@ -189,12 +297,12 @@ float getAlpha(const RTTriangle& triangle, float u, float v) {
     return 1.0f;
 }
 
-std::tuple<int, float, float, float> RayTracer::intersectBVH(
-    const BvhNode& node,
-    const Vec3f& orig,
-    const Vec3f& dir,
-    const Vec3f& invDir,
-    float tmin) const {
+std::tuple<int, float, float, float> RayTracer::intersectBVH(const BvhNode& node,
+                                                             const Vec3f& orig,
+                                                             const Vec3f& dir,
+                                                             const Vec3f& invDir,
+                                                             float tmin,
+                                                             bool useTextures) const {
     if (node.right == nullptr) {  // Leaf node
         float umin = 0.0f, vmin = 0.0f;
         int imin = -1;
@@ -204,8 +312,7 @@ std::tuple<int, float, float, float> RayTracer::intersectBVH(
             const RTTriangle& triangle = (*m_triangles)[triangleIndex];
             if (triangle.intersect_woop(orig, dir, t, u, v)) {
                 if (t > 0.0f && t < tmin) {
-                    if (getAlpha(triangle, u, v) >
-                        0.5) {  // EXTRA: Alpha Texturing
+                    if (!useTextures || getAlpha(triangle, u, v) > 0.5) {  // EXTRA: Alpha Texturing
                         imin = triangleIndex;
                         tmin = t;
                         umin = u;
@@ -229,8 +336,7 @@ std::tuple<int, float, float, float> RayTracer::intersectBVH(
     bool firstRight = didHitRight && (!didHitLeft || tleft > tright);
     const BvhNode& firstNode = firstRight ? *(node.right) : *(node.left);
     const float tBoundOther = firstRight ? tleft : tright;
-    auto firstIntersectioinResult =
-        intersectBVH(firstNode, orig, dir, invDir, tmin);
+    auto firstIntersectioinResult = intersectBVH(firstNode, orig, dir, invDir, tmin, useTextures);
     int firstTriangleIndex = std::get<0>(firstIntersectioinResult);
     float tfirst = std::get<1>(firstIntersectioinResult);
     if ((firstRight && !didHitLeft) || (!firstRight && !didHitRight)) {
@@ -248,8 +354,7 @@ std::tuple<int, float, float, float> RayTracer::intersectBVH(
         }
     }
     const BvhNode& otherNode = firstRight ? *(node.left) : *(node.right);
-    auto otherIntersectioinResult =
-        intersectBVH(otherNode, orig, dir, invDir, tmin);
+    auto otherIntersectioinResult = intersectBVH(otherNode, orig, dir, invDir, tmin, useTextures);
     if (firstTriangleIndex == -1) {
         return otherIntersectioinResult;
     }
@@ -264,7 +369,7 @@ std::tuple<int, float, float, float> RayTracer::intersectBVH(
     return firstIntersectioinResult;
 }
 
-RaycastResult RayTracer::raycast(const Vec3f& orig, const Vec3f& dir) const {
+RaycastResult RayTracer::raycast(const Vec3f& orig, const Vec3f& dir, bool useTextures) const {
     ++m_rayCount;
 
     // YOUR CODE HERE (R1):
@@ -301,7 +406,7 @@ RaycastResult RayTracer::raycast(const Vec3f& orig, const Vec3f& dir) const {
             }
         }
     } else {
-        auto res = intersectBVH(m_bvh.root(), orig, dir, invDir, tmin);
+        auto res = intersectBVH(m_bvh.root(), orig, dir, invDir, tmin, useTextures);
         imin = std::get<0>(res);
         tmin = std::get<1>(res);
         umin = std::get<2>(res);
@@ -309,13 +414,8 @@ RaycastResult RayTracer::raycast(const Vec3f& orig, const Vec3f& dir) const {
     }
 
     if (imin != -1)
-        castresult = RaycastResult(&(*m_triangles)[imin],
-                                   tmin,
-                                   umin,
-                                   vmin,
-                                   orig + tmin * dir,
-                                   orig,
-                                   dir);
+        castresult =
+            RaycastResult(&(*m_triangles)[imin], tmin, umin, vmin, orig + tmin * dir, orig, dir);
 
     return castresult;
 }
