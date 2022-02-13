@@ -63,6 +63,7 @@ timingResult Renderer::rayTracePicture(RayTracer* rt,
         for (int i = 0; i < width; i++)
             image->setVec4f(Vec2i(i, j), Vec4f(.0f));  // initialize image to 0
 
+    const float subpixelSize = 1.0f / (m_aaNumRays * 2.0f);
 // YOUR CODE HERE(R5):
 // remove this to enable multithreading (you also need to enable it in the
 // project properties: C++/Language/Open MP support)
@@ -72,50 +73,60 @@ timingResult Renderer::rayTracePicture(RayTracer* rt,
         Random rnd;
 
         for (int i = 0; i < width; ++i) {
-            // generate ray through pixel
-            float x = (i + 0.5f) / image->getSize().x * 2.0f - 1.0f;
-            float y = (j + 0.5f) / image->getSize().y * -2.0f + 1.0f;
-            // point on front plane in homogeneous coordinates
-            Vec4f P0(x, y, 0.0f, 1.0f);
-            // point on back plane in homogeneous coordinates
-            Vec4f P1(x, y, 1.0f, 1.0f);
+            Vec4f color(0, 0, 0, 0);
+            for (size_t rayInPixelIdx = 0; rayInPixelIdx < m_aaNumRays;
+                 rayInPixelIdx++) {
+                float xJitter = rnd.getF32(-subpixelSize, subpixelSize);
+                float yJitter = rnd.getF32(-subpixelSize, subpixelSize);
+                // generate ray through pixel
+                float jump = (rayInPixelIdx * 2 + 1) * subpixelSize;
+                float x =
+                    (i + jump + xJitter) / image->getSize().x * 2.0f - 1.0f;
+                float y =
+                    (j + jump + yJitter) / image->getSize().y * -2.0f + 1.0f;
+                // point on front plane in homogeneous coordinates
+                Vec4f P0(x, y, 0.0f, 1.0f);
+                // point on back plane in homogeneous coordinates
+                Vec4f P1(x, y, 1.0f, 1.0f);
 
-            // apply inverse projection, divide by w to get object-space points
-            Vec4f Roh = (invP * P0);
-            Vec3f Ro = (Roh * (1.0f / Roh.w)).getXYZ();
-            Vec4f Rdh = (invP * P1);
-            Vec3f Rd = (Rdh * (1.0f / Rdh.w)).getXYZ();
+                // apply inverse projection, divide by w to get object-space
+                // points
+                Vec4f Roh = (invP * P0);
+                Vec3f Ro = (Roh * (1.0f / Roh.w)).getXYZ();
+                Vec4f Rdh = (invP * P1);
+                Vec3f Rd = (Rdh * (1.0f / Rdh.w)).getXYZ();
 
-            // Subtract front plane point from back plane point,
-            // yields ray direction.
-            // NOTE that it's not normalized; the direction Rd is defined
-            // so that the segment to be traced is [Ro, Ro+Rd], i.e.,
-            // intersections that come _after_ the point Ro+Rd are to be
-            // discarded.
-            Rd = Rd - Ro;
+                // Subtract front plane point from back plane point,
+                // yields ray direction.
+                // NOTE that it's not normalized; the direction Rd is defined
+                // so that the segment to be traced is [Ro, Ro+Rd], i.e.,
+                // intersections that come _after_ the point Ro+Rd are to be
+                // discarded.
+                Rd = Rd - Ro;
 
-            // trace!
-            RaycastResult hit = rt->raycast(Ro, Rd);
+                // trace!
+                RaycastResult hit = rt->raycast(Ro, Rd);
 
-            // if we hit something, fetch a color and insert into image
-            Vec4f color(0, 0, 0, 1);
-            if (hit.tri != nullptr) {
-                switch (mode) {
-                    case ShadingMode_Headlight:
-                        color = computeShadingHeadlight(hit, cameraCtrl);
-                        break;
-                    case ShadingMode_AmbientOcclusion:
-                        color = computeShadingAmbientOcclusion(
-                            rt, hit, cameraCtrl, rnd);
-                        break;
-                    case ShadingMode_Whitted:
-                        color =
-                            computeShadingWhitted(rt, hit, cameraCtrl, rnd, 0);
-                        break;
+                // if we hit something, fetch a color and insert into image
+
+                if (hit.tri != nullptr) {
+                    switch (mode) {
+                        case ShadingMode_Headlight:
+                            color += computeShadingHeadlight(hit, cameraCtrl);
+                            break;
+                        case ShadingMode_AmbientOcclusion:
+                            color += computeShadingAmbientOcclusion(
+                                rt, hit, cameraCtrl, rnd);
+                            break;
+                        case ShadingMode_Whitted:
+                            color += computeShadingWhitted(
+                                rt, hit, cameraCtrl, rnd, 0);
+                            break;
+                    }
                 }
             }
             // put pixel.
-            image->setVec4f(Vec2i(i, j), color);
+            image->setVec4f(Vec2i(i, j), color / color.get(3));
         }
 
         // Print progress info
@@ -259,7 +270,7 @@ Vec4f Renderer::computeShadingAmbientOcclusion(RayTracer* rt,
             numHits++;
     }
 
-    return Vec4f(1 - numHits / m_aoNumRays);
+    return Vec4f(Vec3f(1 - numHits / m_aoNumRays), 1.0f);
 }
 
 Vec4f Renderer::computeShadingWhitted(RayTracer* rt,
