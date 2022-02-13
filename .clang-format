@@ -20,4 +20,6 @@ SpacesInAngles: false
 # as those commonly have different usage patterns and a number of special cases.
 SpacesBeforeTrailingComments: 2
 AlignAfterOpenBracket: Align # BlockIndent
+# SeparateDefinitionBlocks: Always
+# IndentPragmas: ?
 # https://github.com/Reewr/master/blob/master/.clang-format
