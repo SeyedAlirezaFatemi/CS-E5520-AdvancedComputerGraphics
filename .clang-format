@@ -2,6 +2,7 @@ BasedOnStyle: Google
 IndentWidth: 4
 TabWidth: 4
 UseTab: Never
+ColumnLimit: 100
 # If false, a function call’s arguments will either be all on the same line or will have one line each.
 BinPackArguments: false
 # If false, a function declaration’s or function definition’s parameters will either all be on the same line or will have one line each.
