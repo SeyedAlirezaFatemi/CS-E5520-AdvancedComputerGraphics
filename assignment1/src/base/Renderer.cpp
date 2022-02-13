@@ -191,6 +191,32 @@ void Renderer::getTextureParameters(const RaycastResult& hit,
         const Image& img = *normalTex.getImage();
         // EXTRA: do tangent space normal mapping
         // first, get texel coordinates as above, for the rest, see handout
+        // http://www.opengl-tutorial.org/intermediate-tutorials/tutorial-13-normal-mapping/
+        Vec2i texelCoords = getTexelCoords(uv, img.getSize());
+        auto normal = 2.0f * img.getVec4f(texelCoords).getXYZ() - 1.0f;
+        const auto& v0 = hit.tri->m_vertices[0].p;
+        const auto& v1 = hit.tri->m_vertices[1].p;
+        const auto& v2 = hit.tri->m_vertices[2].p;
+        const auto& uv0 = hit.tri->m_vertices[0].t;
+        const auto& uv1 = hit.tri->m_vertices[1].t;
+        const auto& uv2 = hit.tri->m_vertices[2].t;
+        // Edges of the triangle : position delta
+        auto deltaPos1 = v1 - v0;
+        auto deltaPos2 = v2 - v0;
+        // UV delta
+        auto deltaUV1 = uv1 - uv0;
+        auto deltaUV2 = uv2 - uv0;
+        float r = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x);
+        auto tangent =
+            normalize((deltaPos1 * deltaUV2.y - deltaPos2 * deltaUV1.y) * r);
+        auto bitangent =
+            normalize((deltaPos2 * deltaUV1.x - deltaPos1 * deltaUV2.x) * r);
+        auto triangleNormal = hit.tri->normal();
+        Mat3f tbn;
+        tbn.setCol(0, tangent);
+        tbn.setCol(1, bitangent);
+        tbn.setCol(2, triangleNormal);
+        n = tbn * normal;
     }
 
     // EXTRA: read a value from the specular texture into specular_mult.
