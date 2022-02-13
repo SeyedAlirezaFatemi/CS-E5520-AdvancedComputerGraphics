@@ -176,6 +176,19 @@ void buildBVH(const std::vector<RTTriangle>& triangles,
     buildBVH(triangles, bvh, *(node.left));
 }
 
+float getAlpha(const RTTriangle& triangle, float u, float v) {
+    Texture& alphaTex =
+        triangle.m_material->textures[MeshBase::TextureType_Alpha];
+    if (alphaTex.exists()) {
+        Vec2f uv{(1.0f - (u + v)) * triangle.m_vertices[0].t +
+                 u * triangle.m_vertices[1].t + v * triangle.m_vertices[2].t};
+        const Image& img = *alphaTex.getImage();
+        Vec2i texelCoords = getTexelCoords(uv, img.getSize());
+        return img.getVec4f(texelCoords).get(0);
+    }
+    return 1.0f;
+}
+
 std::tuple<int, float, float, float> RayTracer::intersectBVH(
     const BvhNode& node,
     const Vec3f& orig,
@@ -191,10 +204,13 @@ std::tuple<int, float, float, float> RayTracer::intersectBVH(
             const RTTriangle& triangle = (*m_triangles)[triangleIndex];
             if (triangle.intersect_woop(orig, dir, t, u, v)) {
                 if (t > 0.0f && t < tmin) {
-                    imin = triangleIndex;
-                    tmin = t;
-                    umin = u;
-                    vmin = v;
+                    if (getAlpha(triangle, u, v) >
+                        0.5) {  // EXTRA: Alpha Texturing
+                        imin = triangleIndex;
+                        tmin = t;
+                        umin = u;
+                        vmin = v;
+                    }
                 }
             }
         }

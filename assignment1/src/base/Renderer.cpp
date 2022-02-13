@@ -183,6 +183,16 @@ void Renderer::getTextureParameters(const RaycastResult& hit,
     }
 
     // EXTRA: read a value from the specular texture into specular_mult.
+    Texture& specularTex = mat->textures[MeshBase::TextureType_Specular];
+    if (specularTex.exists()) {
+        const Image& img = *specularTex.getImage();
+        Vec2i texelCoords = getTexelCoords(uv, img.getSize());
+        specular = img.getVec4f(texelCoords).getXYZ();
+    }
+}
+
+void print(const Vec3f& vec) {
+    std::cout << vec[0] << " " << vec[1] << " " << vec[2] << "\n";
 }
 
 Vec4f Renderer::computeShadingHeadlight(const RaycastResult& hit,
@@ -197,13 +207,27 @@ Vec4f Renderer::computeShadingHeadlight(const RaycastResult& hit,
 
     if (m_useTextures) getTextureParameters(hit, diffuse, n, specular);
 
+    Vec3f viewDir = (hit.point - cameraCtrl.getPosition()).normalized();
     // dot with view ray direction <=> "headlight shading"
-    float d = fabs(dot(n, (hit.point - cameraCtrl.getPosition()).normalized()));
+    float d = fabs(dot(n, viewDir));
 
-    // assign gray value (d,d,d)
+    // https://www.rastertek.com/dx10tut21.html
+    // https://learnopengl.com/Lighting/Lighting-maps
+    // Vec3f lightDir = (hit.point - m_pointLightPos).normalized();
+    Vec3f lightDir = -viewDir;
+
+    float lightIntensity = fabs(dot(n, lightDir));
+    // Calculate the reflection vector based on the light intensity, normal
+    // vector, and light direction.
+    Vec3f reflectionDir = normalize(2 * lightIntensity * n - lightDir);
+    float specularCoef =
+        pow(fabs(dot(reflectionDir, viewDir)), mat->glossiness);
+    specular *= specularCoef;
+
+    // assign gray value (d,d,d). Implicit initialization
     Vec3f shade = d;
 
-    return Vec4f(shade * diffuse, 1.0f);
+    return Vec4f(shade * diffuse + specular * specularCoef, 1.0f);
 }
 
 Vec3f getRandomPointHalfSphere(Random& rnd) {
