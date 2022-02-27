@@ -146,16 +146,36 @@ void buildBVH(const std::vector<RTTriangle>& triangles,
     static const int numIntervals = 8;  // For SplitMode_Sah
     // Don't split this node if it has less than 10 triangles.
     if (node.endPrim - node.startPrim < 10) return;
+
     int partitionIndex;
     auto& indices = bvh.indices();
     bool sahOK = false;
     if (splitMode == SplitMode_Sah) {
         auto diagonal = node.bb.max - node.bb.min;
+        /*
+        Assume 5 intervals:
+        min            max
+        '  '  '  '  '  '
+        0  1  2  3  4  5   Partition Ends
+          0  1  2  3  4    Partition
+          0  1  2  3  4    For Left
+          4  3  2  1  0    For Right
+        leftBoundingBoxes  => [[0], [0, 1], [0, 1, 2], [0, 1, 2, 3]] * 3 (One for each axis)
+        rightBoundingBoxes => [[0], [0, 1], [0, 1, 2], [0, 1, 2, 3]] * 3 (One for each axis)
+        partitionEnds      => [1, 2, 3, 4, 5] * 3 (One for each axis)
+        We have the following options for partitioning:
+        [[0, 1, 2, 3], [4]]
+        [[0, 1, 2], [3, 4]]
+        [[0, 1], [2, 3, 4]]
+        [[0], [1, 2, 3, 4]]
+        The bounding boxes in the two vectors that we have, help with deciding which option is best.
+        */
         std::vector<std::vector<AABB>> leftBoundingBoxes;
         std::vector<std::vector<AABB>> rightBoundingBoxes;
         std::vector<std::vector<int>> leftNumTriangles;
         std::vector<std::vector<int>> rightNumTriangles;
         std::vector<std::vector<float>> partitionEnds{{}, {}, {}};
+
         for (size_t axis = 0; axis < 3; axis++) {
             // Add a vector of zeros
             leftNumTriangles.emplace_back(numIntervals - 1, 0);
@@ -178,7 +198,6 @@ void buildBVH(const std::vector<RTTriangle>& triangles,
             }
         }
         // Distribute the triangles between intervals
-        // TODO: Add more comments.
         for (size_t i = node.startPrim; i < node.endPrim; i++) {
             const auto& triangle = triangles[bvh.getIndex(i)];
             const auto triangleCentroid = triangle.centroid();
@@ -190,6 +209,8 @@ void buildBVH(const std::vector<RTTriangle>& triangles,
                   0  1  2  3  4    Left
                   4  3  2  1  0    Right
                 */
+                // Use binary search to find out in which partition this triangle is
+                // Just need to compare with partitionEnds[axis]
                 int insertionIdx =
                     binarySearch(partitionEnds[axis], triangleCentroid.get(axis));  // 0 -> 4
                 // 0 1 2 3 -4-
@@ -209,7 +230,7 @@ void buildBVH(const std::vector<RTTriangle>& triangles,
         float partitionPoint;
         float bestScore = std::numeric_limits<float>::max();
         float score;
-        std::vector<float> scores;
+        // std::vector<float> scores; // For debug purposes
         for (size_t axis = 0; axis < 3; axis++) {
             float leftArea, rightArea;
             for (size_t intervalIndex = 0; intervalIndex < numIntervals - 1; intervalIndex++) {
@@ -222,7 +243,7 @@ void buildBVH(const std::vector<RTTriangle>& triangles,
                 rightArea = rightBoundingBoxes[axis][numIntervals - intervalIndex - 1 - 1].area();
                 sahOK = true;
                 score = leftArea * leftNum + rightArea * rightNum;
-                scores.push_back(score);
+                // scores.push_back(score);
                 if (score < bestScore) {
                     bestScore = score;
                     bestAxis = axis;
@@ -235,14 +256,17 @@ void buildBVH(const std::vector<RTTriangle>& triangles,
                 indices.begin() + node.startPrim,
                 indices.begin() + node.endPrim,
                 [bestAxis, partitionPoint, &triangles](const size_t& triangleIndex) {
-                    // Cruicial to have <= instead of <.
+                    // ! Crucial to have <= instead of <.
+                    // That's because of the way we assign the triangles to the partitions. If the
+                    // triangle's centroid is on the partition's end, it is assigned to that
+                    // partition.
                     return triangles[triangleIndex].centroid().get(bestAxis) <= partitionPoint;
                 });
             partitionIndex = iter - indices.begin();
 
-            // TODO: Improve.
+            // Error case - Does not happen. Let's be safe just in case!
             if (partitionIndex - node.startPrim == 0) {
-                std::cout << "Left size: " << node.endPrim - partitionIndex << "\n";
+                sahOK = false;
             }
         }
     }
@@ -286,7 +310,7 @@ void buildBVH(const std::vector<RTTriangle>& triangles,
 }
 
 float getAlpha(const RTTriangle& triangle, float u, float v) {
-    Texture& alphaTex = triangle.m_material->textures[MeshBase::TextureType_Alpha];
+    const Texture& alphaTex = triangle.m_material->textures[MeshBase::TextureType_Alpha];
     if (alphaTex.exists()) {
         Vec2f uv{(1.0f - (u + v)) * triangle.m_vertices[0].t + u * triangle.m_vertices[1].t +
                  v * triangle.m_vertices[2].t};
@@ -327,46 +351,59 @@ std::tuple<int, float, float, float> RayTracer::intersectBVH(const BvhNode& node
     auto rightResult = node.right->bb.intersect(orig, dir, invDir, 0.0f);
     float tright = std::get<1>(rightResult);
     bool didHitRight = std::get<0>(rightResult) && tright < tmin;
+
     auto leftResult = node.left->bb.intersect(orig, dir, invDir, 0.0f);
     float tleft = std::get<1>(leftResult);
     bool didHitLeft = std::get<0>(leftResult) && tleft < tmin;
+
+    // Check any hit
     if (!didHitLeft && !didHitRight) {
         return std::make_tuple(-1, 0.0, 0.0, 0.0);
     }
+
+    // Decide which node we should check first
     bool firstRight = didHitRight && (!didHitLeft || tleft > tright);
     const BvhNode& firstNode = firstRight ? *(node.right) : *(node.left);
+    // Lower bound on any possible hit in the other node
     const float tBoundOther = firstRight ? tleft : tright;
-    auto firstIntersectioinResult = intersectBVH(firstNode, orig, dir, invDir, tmin, useTextures);
-    int firstTriangleIndex = std::get<0>(firstIntersectioinResult);
-    float tfirst = std::get<1>(firstIntersectioinResult);
+
+    auto firstIntersectionResult = intersectBVH(firstNode, orig, dir, invDir, tmin, useTextures);
+    int firstTriangleIndex = std::get<0>(firstIntersectionResult);
+    float tfirst = std::get<1>(firstIntersectionResult);
+
     if ((firstRight && !didHitLeft) || (!firstRight && !didHitRight)) {
         // No other node to check
-        return firstIntersectioinResult;
+        return firstIntersectionResult;
     }
+
     if (firstTriangleIndex != -1) {
         // Update tmin
         if (tfirst < tmin) {
             tmin = tfirst;
-            // This is very important for performance.
+            // ! This is very important for performance.
             if (tmin < tBoundOther) {
-                return firstIntersectioinResult;
+                // No need to check the other node
+                return firstIntersectionResult;
             }
         }
     }
+
     const BvhNode& otherNode = firstRight ? *(node.left) : *(node.right);
-    auto otherIntersectioinResult = intersectBVH(otherNode, orig, dir, invDir, tmin, useTextures);
+    auto otherIntersectionResult = intersectBVH(otherNode, orig, dir, invDir, tmin, useTextures);
+
     if (firstTriangleIndex == -1) {
-        return otherIntersectioinResult;
+        return otherIntersectionResult;
     }
-    int otherTriangleIndex = std::get<0>(otherIntersectioinResult);
+
+    int otherTriangleIndex = std::get<0>(otherIntersectionResult);
     if (otherTriangleIndex != -1) {
-        float tother = std::get<1>(otherIntersectioinResult);
+        float tother = std::get<1>(otherIntersectionResult);
         if (tother > tmin) {
-            return firstIntersectioinResult;
+            return firstIntersectionResult;
         }
-        return otherIntersectioinResult;
+        return otherIntersectionResult;
     }
-    return firstIntersectioinResult;
+    return firstIntersectionResult;
 }
 
 RaycastResult RayTracer::raycast(const Vec3f& orig, const Vec3f& dir, bool useTextures) const {
@@ -387,7 +424,6 @@ RaycastResult RayTracer::raycast(const Vec3f& orig, const Vec3f& dir, bool useTe
     // Note: tmin should be initialized with 1.0f
     float tmin = 1.0f, umin = 0.0f, vmin = 0.0f;
     int imin = -1;
-    // Check if hits the scene then start the recursive call
 
     RaycastResult castresult;
 
