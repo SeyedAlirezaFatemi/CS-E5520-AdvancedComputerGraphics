@@ -7,7 +7,7 @@ ColumnLimit: 100
 BinPackArguments: false
 # If false, a function declaration’s or function definition’s parameters will either all be on the same line or will have one line each.
 BinPackParameters: false
-# If true, clang-format detetects whether function call defintions are formatted with one parameter per line.
+# If true, clang-format detects whether function call definitions are formatted with one parameter per line.
 ExperimentalAutoDetectBinPacking: false
 # Allow putting all parameters of a function declaration onto the next line even if BinPackParameters is false.
 AllowAllParametersOfDeclarationOnNextLine: true
