@@ -20,6 +20,6 @@ Efficient SAH building
 Optimize your tracer (Early exits in tree traversal and intersection routines + Choose the minimum triangle count of the leaf nodes on your BVH carefully)
 
 
-SAH is used by default. I didn't have time to add a button for it. The implementation starts at line 142 in RayTracer.cpp.
+SAH is used by default. I didn't have time to add a button for it. The implementation is in the buildBVH function in RayTracer.cpp.
 Changing if (splitMode == SplitMode_Sah) to if (false) will switch to Spatial Median.
 The construction is O(n). Using this instead of Spatial Median doubles the speed in the crytek-sponza scene.
