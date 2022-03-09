@@ -15,6 +15,18 @@ Radiosity::~Radiosity() {
     }
 }
 
+std::tuple<Vec3f, float> getRandomPointHalfSphere(Random& rnd) {
+    float x, y,
+        sumSquares = 2.0f;  // Initialize with 2.0f so we enter the while loop
+    while (sumSquares > 1) {
+        x = rnd.getF32(-1, 1);
+        y = rnd.getF32(-1, 1);
+        sumSquares = FW::pow(x, 2) + FW::pow(y, 2);
+    }
+    float z = FW::sqrt(1 - sumSquares);
+    return std::make_tuple(Vec3f(x, y, z), z / FW_PI);
+}
+
 // --------------------------------------------------------------------------
 void Radiosity::vertexTaskFunc(MulticoreLauncher::Task& task) {
     RadiosityContext& ctx = *(RadiosityContext*)task.data;
@@ -23,11 +35,11 @@ void Radiosity::vertexTaskFunc(MulticoreLauncher::Task& task) {
 
     // which vertex are we to compute?
     int v = task.idx;
-
+    float eps = 1e-4;
     // fetch vertex and its normal
     Vec3f n = ctx.m_scene->vertex(v).n.normalized();
-    // vertex position moved a little bit in the direction of the normal
-    Vec3f o = ctx.m_scene->vertex(v).p + 0.0001f * n;
+    // Nudge the vertex position very slightly towards the normal
+    Vec3f o = ctx.m_scene->vertex(v).p + eps * n;
 
     // YOUR CODE HERE (R3):
     // This starter code merely puts the color-coded normal into the result.
@@ -40,30 +52,88 @@ void Radiosity::vertexTaskFunc(MulticoreLauncher::Task& task) {
     // an idea of the loop structure. Note that you also have to account
     // for how diffuse textures modulate the irradiance.
 
-    // (R2) - Area Light Source
-    float pdf;
-    Vec3f p{0.f}, to_light{0.f};
     Random rnd{0};
     Vec3f irr{0.f};
-    for (size_t i = 0; i < ctx.m_numDirectRays; i++) {
-        ctx.m_light->sample(pdf, p, 0, rnd);
-        to_light = p - o;
-        // Check if we are behind the light source
-        if (FW::dot(ctx.m_light->getNormal(), -FW::normalize(to_light)) < 0) {
-            continue;
+    if (ctx.m_currentBounce == 0) {
+        // (R2) - Area Light Source
+        // Direct lighting pass => integrate direct illumination by shooting shadow rays to light
+        // source
+        float pdf;
+        Vec3f p{0.f}, to_light{0.f};
+        for (size_t i = 0; i < ctx.m_numDirectRays; i++) {
+            // Draw sample on light source
+            ctx.m_light->sample(pdf, p, 0, rnd);
+            // Construct vector from current vertex (o) to light sample
+            to_light = p - o;
+            // Trace shadow ray to see if it's blocked
+            auto res = ctx.m_rt->raycast(o, to_light);
+            if (res.tri) {
+                // Blocked
+            } else {
+                // Add the appropriate emission, 1/r^2 and clamped cosine terms, accounting for the
+                // PDF as well.
+                auto cos_theta = FW::max(FW::dot(FW::normalize(to_light), n), 0.f);
+                auto cos_theta_l =
+                    FW::max(FW::dot(-FW::normalize(to_light), ctx.m_light->getNormal()), 0.f);
+                irr += ctx.m_light->getEmission() * cos_theta * cos_theta_l /
+                       (to_light.lenSqr() * pdf);
+            }
         }
-        auto res = ctx.m_rt->raycast(o, to_light);
-        if (res.tri) {
-            // Blocked
-        } else {
-            auto cos_theta = FW::dot(FW::normalize(to_light), n);
-            auto cos_theta_l = FW::dot(-FW::normalize(to_light), ctx.m_light->getNormal());
-            irr += ctx.m_light->getEmission() * cos_theta * cos_theta_l / (to_light.lenSqr() * pdf);
+        // Note we are NOT multiplying by PI here;
+        // it's implicit in the hemisphere-to-light source area change of variables.
+        // The result we are computing is _irradiance_, not radiosity.
+        irr /= ctx.m_numDirectRays;
+    } else {
+        // (R3)
+        // OK, time for indirect!
+        // Implement hemispherical gathering integral for bounces > 1.
+        for (size_t i = 0; i < ctx.m_numHemisphereRays; i++) {
+            // Draw a local weighted direction and find out where it hits (if anywhere)
+            auto [local_direction, pdf] = getRandomPointHalfSphere(rnd);
+            // Get local coordinate system the rays are shot from.
+            auto basis = formBasis(n);
+            auto direction = basis * local_direction;
+            // Make the direction long but not too long to avoid numerical instability in the ray
+            // tracer. For our scenes, 100 is a good length. (I know, this special casing sucks.)
+            // Shoot ray, see where we hit
+            auto res = ctx.m_rt->raycast(o, direction * 100);
+            if (res.tri) {
+                const auto& triangle = *(res.tri);
+                // check for backfaces => don't accumulate if we hit a surface from below!
+                if (FW::dot(-FW::normalize(direction), triangle.normal()) < 0) {
+                    continue;
+                }
+                // Fetch barycentric coordinates
+                auto u = res.u;
+                auto v = res.v;
+                auto cos_theta = FW::max(FW::dot(FW::normalize(direction), n), 0.f);
+                const auto& indices = triangle.m_data.vertex_indices;
+                // Interpolate lighting from previous pass
+                Vec3f irradiance = (1.0f - (u + v)) * ctx.m_vecPrevBounce[indices[0]] +
+                                   u * ctx.m_vecPrevBounce[indices[1]] +
+                                   v * ctx.m_vecPrevBounce[indices[2]];
+                const auto mat = triangle.m_material;
+                Vec3f& diffuse = mat->diffuse.getXYZ();
+                const Texture& diffuseTex = mat->textures[MeshBase::TextureType_Diffuse];
+                if (diffuseTex.exists()) {
+                    const Vec2f uv{(1.0f - (u + v)) * triangle.m_vertices[0].t +
+                                   u * triangle.m_vertices[1].t + v * triangle.m_vertices[2].t};
+                    const Image& img = *diffuseTex.getImage();
+                    // Fetch diffuse color from texture
+                    const Vec2i texelCoords = getTexelCoords(uv, img.getSize());
+                    diffuse = img.getVec4f(texelCoords).getXYZ();
+                } else {
+                    // No texture, use constant albedo from material structure.
+                    // Already initialized with this value.
+                }
+                auto outgoing_radiosity = irradiance * diffuse / FW_PI;
+                irr += outgoing_radiosity * cos_theta / pdf;
+            }
         }
+        irr /= ctx.m_numHemisphereRays;
     }
-    irr /= ctx.m_numDirectRays;
 
-    ctx.m_vecResult[v] = irr;
+    ctx.m_vecResult[v] += irr;
     ctx.m_vecCurr[v] = irr;
 }
 // --------------------------------------------------------------------------

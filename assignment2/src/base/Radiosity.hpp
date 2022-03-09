@@ -13,6 +13,8 @@ class RayTracer;
 
 float sphericalHarmonicFactor(int order, int index);
 
+std::tuple<Vec3f, float> getRandomPointHalfSphere(Random& rnd);
+
 //------------------------------------------------------------------------
 
 typedef Mesh<VertexPNTC> MeshWithColors;
