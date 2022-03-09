@@ -42,8 +42,11 @@ void AreaLight::sample(float& pdf, Vec3f& p, int base, Random& rnd) {
     // the outside. If you only implement purely random sampling, "base" is not required.
 
     // (this does not do what it's supposed to!)
-    pdf = 1.0f;
-    p = Vec4f(m_xform.getCol(3)).getXYZ();
+    pdf = 1.f / (4.f * m_size.x * m_size.y);
+    auto x = rnd.getF32(-1.f, 1.f);
+    auto y = rnd.getF32(-1.f, 1.f);
+    Mat4f S = Mat4f::scale(Vec3f(m_size, 1));
+    p = m_xform * S * Vec3f(x, y, 0.f);
 }
 
 }  // namespace FW
