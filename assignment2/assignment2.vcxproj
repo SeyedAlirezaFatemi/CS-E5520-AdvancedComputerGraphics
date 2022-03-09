@@ -604,6 +604,8 @@
   <ItemGroup>
     <ClCompile Include="src\base\App.cpp" />
     <ClCompile Include="src\base\AreaLight.cpp" />
+    <ClCompile Include="src\base\Bvh.cpp" />
+    <ClCompile Include="src\base\BvhNode.cpp" />
     <ClCompile Include="src\base\Md5.c" />
     <ClCompile Include="src\base\Radiosity.cpp" />
     <ClCompile Include="src\base\RayTracer.cpp" />
@@ -612,7 +614,10 @@
   <ItemGroup>
     <ClInclude Include="src\base\App.hpp" />
     <ClInclude Include="src\base\AreaLight.hpp" />
+    <ClInclude Include="src\base\Bvh.hpp" />
+    <ClInclude Include="src\base\BvhNode.hpp" />
     <ClInclude Include="src\base\filesaves.hpp" />
+    <ClInclude Include="src\base\QMC.hpp" />
     <ClInclude Include="src\base\Radiosity.hpp" />
     <ClInclude Include="src\base\RaycastResult.hpp" />
     <ClInclude Include="src\base\RayTracer.hpp" />
