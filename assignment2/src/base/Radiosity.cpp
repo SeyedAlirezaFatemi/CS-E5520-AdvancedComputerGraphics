@@ -26,7 +26,8 @@ void Radiosity::vertexTaskFunc(MulticoreLauncher::Task& task) {
 
     // fetch vertex and its normal
     Vec3f n = ctx.m_scene->vertex(v).n.normalized();
-    Vec3f o = ctx.m_scene->vertex(v).p + 0.01f * n;
+    // vertex position moved a little bit in the direction of the normal
+    Vec3f o = ctx.m_scene->vertex(v).p + 0.0001f * n;
 
     // YOUR CODE HERE (R3):
     // This starter code merely puts the color-coded normal into the result.
@@ -39,10 +40,31 @@ void Radiosity::vertexTaskFunc(MulticoreLauncher::Task& task) {
     // an idea of the loop structure. Note that you also have to account
     // for how diffuse textures modulate the irradiance.
 
-    // This is the dummy implementation you should remove.
-    ctx.m_vecResult[v] = n * 0.5 + 0.5;
-    Sleep(1);
-    return;
+    // (R2) - Area Light Source
+    float pdf;
+    Vec3f p{0.f}, to_light{0.f};
+    Random rnd{0};
+    Vec3f irr{0.f};
+    for (size_t i = 0; i < ctx.m_numDirectRays; i++) {
+        ctx.m_light->sample(pdf, p, 0, rnd);
+        to_light = p - o;
+        // Check if we are behind the light source
+        if (FW::dot(ctx.m_light->getNormal(), -FW::normalize(to_light)) < 0) {
+            continue;
+        }
+        auto res = ctx.m_rt->raycast(o, to_light);
+        if (res.tri) {
+            // Blocked
+        } else {
+            auto cos_theta = FW::dot(FW::normalize(to_light), n);
+            auto cos_theta_l = FW::dot(-FW::normalize(to_light), ctx.m_light->getNormal());
+            irr += ctx.m_light->getEmission() * cos_theta * cos_theta_l / (to_light.lenSqr() * pdf);
+        }
+    }
+    irr /= ctx.m_numDirectRays;
+
+    ctx.m_vecResult[v] = irr;
+    ctx.m_vecCurr[v] = irr;
 }
 // --------------------------------------------------------------------------
 
