@@ -434,7 +434,8 @@ RaycastResult RayTracer::raycast(const Vec3f& orig, const Vec3f& dir, bool useTe
 
     // You can use this existing code for leaf nodes of the BVH (you do want to
     // change the range of the loop to match the elements the leaf covers.)
-    // Note: tmin should be initialized with 1.0f
+    // ! Note: tmin should be initialized with 1.0f.
+    // Reason: We take ray length that is the length of dir into account.
     float tmin = 1.0f, umin = 0.0f, vmin = 0.0f;
     int imin = -1;
 
