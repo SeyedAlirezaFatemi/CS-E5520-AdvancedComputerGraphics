@@ -48,7 +48,7 @@ class RayTracer {
     void loadHierarchy(const char* filename,
                        std::vector<RTTriangle>& triangles);
 
-    RaycastResult raycast(const Vec3f& orig, const Vec3f& dir, bool useTextures) const;
+    RaycastResult raycast(const Vec3f& orig, const Vec3f& dir, bool useTextures = false) const;
 
     // This function computes an MD5 checksum of the input scene data,
     // WITH the assumption that all vertices are allocated in one big chunk.
