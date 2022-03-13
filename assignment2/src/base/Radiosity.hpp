@@ -6,6 +6,7 @@
 #include <base/Random.hpp>
 #include <vector>
 
+#include "sobol.hpp"
 #include "util.hpp"
 
 namespace FW {

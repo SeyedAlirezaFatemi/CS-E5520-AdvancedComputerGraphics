@@ -1,5 +1,6 @@
-
 #include "AreaLight.hpp"
+
+#include <iostream>
 
 namespace FW {
 
@@ -41,10 +42,13 @@ void AreaLight::sample(float& pdf, Vec3f& p, int base, Random& rnd) {
     // Use the "base" input for controlling the progression of the sequence from
     // the outside. If you only implement purely random sampling, "base" is not required.
 
-    // (this does not do what it's supposed to!)
     pdf = 1.f / (4.f * m_size.x * m_size.y);
-    auto x = rnd.getF32(-1.f, 1.f);
-    auto y = rnd.getF32(-1.f, 1.f);
+    // auto x = rnd.getF32(-1.f, 1.f);
+    // auto y = rnd.getF32(-1.f, 1.f);
+
+    auto x = sobol::sample(base, 0) * 2 - 1;
+    auto y = sobol::sample(base, 1) * 2 - 1;
+
     Mat4f S = Mat4f::scale(Vec3f(m_size, 1));
     p = m_xform * S * Vec3f(x, y, 0.f);
 }

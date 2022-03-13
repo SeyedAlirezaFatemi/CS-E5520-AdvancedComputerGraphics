@@ -609,6 +609,7 @@
     <ClCompile Include="src\base\Md5.c" />
     <ClCompile Include="src\base\Radiosity.cpp" />
     <ClCompile Include="src\base\RayTracer.cpp" />
+    <ClCompile Include="src\base\sobol.cpp" />
     <ClCompile Include="src\base\util.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -625,6 +626,7 @@
     <ClInclude Include="src\base\RTToMesh.hpp" />
     <ClInclude Include="src\base\RTTriangle.hpp" />
     <ClInclude Include="src\base\rtutil.hpp" />
+    <ClInclude Include="src\base\sobol.hpp" />
     <ClInclude Include="src\base\util.hpp" />
   </ItemGroup>
   <ItemGroup>

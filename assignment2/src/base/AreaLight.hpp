@@ -4,6 +4,7 @@
 #include <base/Random.hpp>
 #include <io/StateDump.hpp>
 
+#include "sobol.hpp"
 
 namespace FW
 {

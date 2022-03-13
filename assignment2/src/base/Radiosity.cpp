@@ -15,14 +15,22 @@ Radiosity::~Radiosity() {
     }
 }
 
-std::tuple<Vec3f, float> getRandomPointHalfSphere(Random& rnd) {
+std::tuple<Vec3f, float> getRandomPointHalfSphere(Random& rnd, int& ind) {
     float x, y,
         sumSquares = 2.0f;  // Initialize with 2.0f so we enter the while loop
     while (sumSquares > 1) {
-        x = rnd.getF32(-1, 1);
-        y = rnd.getF32(-1, 1);
+        // x = rnd.getF32(-1, 1);
+        // y = rnd.getF32(-1, 1);
+
+        x = sobol::sample(ind, 0) * 2 - 1;
+        y = sobol::sample(ind, 1) * 2 - 1;
+
         sumSquares = FW::pow(x, 2) + FW::pow(y, 2);
+        if (sumSquares > 1) {
+            ind++;
+        }
     }
+    ind++;
     float z = FW::sqrt(1 - sumSquares);
     return std::make_tuple(Vec3f(x, y, z), z / FW_PI);
 }
@@ -62,7 +70,7 @@ void Radiosity::vertexTaskFunc(MulticoreLauncher::Task& task) {
         Vec3f p{0.f}, to_light{0.f};
         for (size_t i = 0; i < ctx.m_numDirectRays; i++) {
             // Draw sample on light source
-            ctx.m_light->sample(pdf, p, 0, rnd);
+            ctx.m_light->sample(pdf, p, i, rnd);
             // Construct vector from current vertex (o) to light sample
             to_light = p - o;
             // Trace shadow ray to see if it's blocked
@@ -87,9 +95,10 @@ void Radiosity::vertexTaskFunc(MulticoreLauncher::Task& task) {
         // (R3)
         // OK, time for indirect!
         // Implement hemispherical gathering integral for bounces > 1.
+        int ind = 0;
         for (size_t i = 0; i < ctx.m_numHemisphereRays; i++) {
             // Draw a local weighted direction and find out where it hits (if anywhere)
-            auto [local_direction, pdf] = getRandomPointHalfSphere(rnd);
+            auto [local_direction, pdf] = getRandomPointHalfSphere(rnd, ind);
             // Get local coordinate system the rays are shot from.
             auto basis = formBasis(n);
             auto direction = basis * local_direction;
