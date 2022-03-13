@@ -23,7 +23,7 @@ void AreaLight::draw(const Mat4f& worldToCamera, const Mat4f& projection) {
     glEnd();
 }
 
-void AreaLight::sample(float& pdf, Vec3f& p, int base, Random& rnd) {
+void AreaLight::sample(float& pdf, Vec3f& p, int index, Random& rnd) {
     // YOUR CODE HERE (R2):
     // You should draw a random point on the light source and evaluate the PDF.
     // Store the results in "pdf" and "p".
@@ -39,15 +39,16 @@ void AreaLight::sample(float& pdf, Vec3f& p, int base, Random& rnd) {
     // This has implications for the computation of the PDF.
 
     // For extra credit, implement QMC sampling using some suitable sequence.
-    // Use the "base" input for controlling the progression of the sequence from
-    // the outside. If you only implement purely random sampling, "base" is not required.
+    // Use the "index" input for controlling the progression of the sequence from
+    // the outside. If you only implement purely random sampling, "index" is not required.
 
     pdf = 1.f / (4.f * m_size.x * m_size.y);
+
     // auto x = rnd.getF32(-1.f, 1.f);
     // auto y = rnd.getF32(-1.f, 1.f);
 
-    auto x = sobol::sample(base, 0) * 2 - 1;
-    auto y = sobol::sample(base, 1) * 2 - 1;
+    auto x = sobol::sample(index, 0) * 2 - 1;
+    auto y = sobol::sample(index, 1) * 2 - 1;
 
     Mat4f S = Mat4f::scale(Vec3f(m_size, 1));
     p = m_xform * S * Vec3f(x, y, 0.f);

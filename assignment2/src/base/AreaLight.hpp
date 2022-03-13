@@ -20,8 +20,8 @@ public:
     AreaLight() : m_E(100,100,100), m_size(0.25f,0.25f) { }
 
     // this function draws samples on the light source for computing direct illumination
-    // the "base" input can be used for driving QMC samplers; unless you do something to it yourself, has no effect.
-    void			sample( float& pdf, Vec3f& p, int base, Random& rnd );
+    // the "index" input can be used for driving QMC samplers; unless you do something to it yourself, has no effect.
+    void			sample( float& pdf, Vec3f& p, int index, Random& rnd );
 
     Vec3f			getPosition(void) const			{ return Vec4f(m_xform.getCol(3)).getXYZ(); }
     void			setPosition(const Vec3f& p)		{ m_xform.setCol(3, Vec4f(p, 1.0f)); }
