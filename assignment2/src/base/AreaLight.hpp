@@ -22,6 +22,15 @@ class AreaLight {
     // yourself, has no effect.
     void sample(float& pdf, Vec3f& p, int index, Random& rnd);
 
+    void AreaLight::sampleStratified(float& pdf,
+                                     Vec3f& p,
+                                     int index,
+                                     Random& rnd,
+                                     float x,
+                                     float y,
+                                     float halfStepX,
+                                     float halfStepY);
+
     Vec3f getPosition(void) const { return Vec4f(m_xform.getCol(3)).getXYZ(); }
     void setPosition(const Vec3f& p) { m_xform.setCol(3, Vec4f(p, 1.0f)); }
 
@@ -56,6 +65,8 @@ class AreaLight {
         d.set(m_E, "E");
         d.popOwner();
     }
+
+    Vec2f getSize() { return m_size; }
 
    protected:
     Mat4f m_xform;  // Encodes position and orientation in world space.

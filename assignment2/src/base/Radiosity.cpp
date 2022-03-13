@@ -1,5 +1,7 @@
 #include "Radiosity.hpp"
 
+#include <cmath>
+
 #include "AreaLight.hpp"
 #include "RayTracer.hpp"
 
@@ -68,29 +70,71 @@ void Radiosity::vertexTaskFunc(MulticoreLauncher::Task& task) {
         // source
         float pdf;
         Vec3f p{0.f}, to_light{0.f};
-        for (size_t i = 0; i < ctx.m_numDirectRays; i++) {
-            // Draw sample on light source
-            ctx.m_light->sample(pdf, p, i, rnd);
-            // Construct vector from current vertex (o) to light sample
-            to_light = p - o;
-            // Trace shadow ray to see if it's blocked
-            auto res = ctx.m_rt->raycast(o, to_light);
-            if (res.tri) {
-                // Blocked
-            } else {
-                // Add the appropriate emission, 1/r^2 and clamped cosine terms, accounting for the
-                // PDF as well.
-                auto cos_theta = FW::max(FW::dot(FW::normalize(to_light), n), 0.f);
-                auto cos_theta_l =
-                    FW::max(FW::dot(-FW::normalize(to_light), ctx.m_light->getNormal()), 0.f);
-                irr += ctx.m_light->getEmission() * cos_theta * cos_theta_l /
-                       (to_light.lenSqr() * pdf);
+
+        // EXTRA: Stratified sampling of the light area
+        auto lightSize = ctx.m_light->getSize();
+        float ratio = lightSize.x / lightSize.y;
+        int numXPartitions = static_cast<int>(FW::ceil(std::sqrt(ctx.m_numDirectRays) * ratio));
+        int numYPartitions = static_cast<int>(FW::ceil(std::sqrt(ctx.m_numDirectRays) / ratio));
+        int numDirectRays = numYPartitions * numXPartitions;
+        int ind = 0;
+        float halfStepX = 1.f / numXPartitions;
+        float halfStepY = 1.f / numYPartitions;
+        float x = -1.f, y = -1.f;
+        for (size_t xIdx = 0; xIdx < numXPartitions; xIdx++) {
+            x += 2 * halfStepX;
+            for (size_t yIdx = 0; yIdx < numYPartitions; yIdx++) {
+                y += 2 * halfStepY;
+                // Draw sample on light source
+                ctx.m_light->sampleStratified(pdf, p, ind, rnd, x, y, halfStepX, halfStepY);
+                // Construct vector from current vertex (o) to light sample
+                to_light = p - o;
+                // Trace shadow ray to see if it's blocked
+                auto res = ctx.m_rt->raycast(o, to_light);
+                if (res.tri) {
+                    // Blocked
+                } else {
+                    // Add the appropriate emission, 1/r^2 and clamped cosine terms, accounting for
+                    // the PDF as well.
+                    auto cos_theta = FW::max(FW::dot(FW::normalize(to_light), n), 0.f);
+                    auto cos_theta_l =
+                        FW::max(FW::dot(-FW::normalize(to_light), ctx.m_light->getNormal()), 0.f);
+                    irr += ctx.m_light->getEmission() * cos_theta * cos_theta_l /
+                           (to_light.lenSqr() * pdf);
+                }
+                ind++;
             }
+            y = -1.f;
         }
+
+        irr /= numDirectRays;
+
+        // Simple sampling
+
+        // for (size_t i = 0; i < numDirectRays; i++) {
+        //     // Draw sample on light source
+        //     ctx.m_light->sample(pdf, p, i, rnd);
+        //     // Construct vector from current vertex (o) to light sample
+        //     to_light = p - o;
+        //     // Trace shadow ray to see if it's blocked
+        //     auto res = ctx.m_rt->raycast(o, to_light);
+        //     if (res.tri) {
+        //         // Blocked
+        //     } else {
+        //         // Add the appropriate emission, 1/r^2 and clamped cosine terms, accounting for
+        //         // PDF as well.
+        //         auto cos_theta = FW::max(FW::dot(FW::normalize(to_light), n), 0.f);
+        //         auto cos_theta_l =
+        //             FW::max(FW::dot(-FW::normalize(to_light), ctx.m_light->getNormal()), 0.f);
+        //         irr += ctx.m_light->getEmission() * cos_theta * cos_theta_l /
+        //                (to_light.lenSqr() * pdf);
+        //     }
+        // }
+
         // Note we are NOT multiplying by PI here;
         // it's implicit in the hemisphere-to-light source area change of variables.
         // The result we are computing is _irradiance_, not radiosity.
-        irr /= ctx.m_numDirectRays;
+        // irr /= ctx.m_numDirectRays;
     } else {
         // (R3)
         // OK, time for indirect!

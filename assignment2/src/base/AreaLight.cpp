@@ -54,4 +54,19 @@ void AreaLight::sample(float& pdf, Vec3f& p, int index, Random& rnd) {
     p = m_xform * S * Vec3f(x, y, 0.f);
 }
 
+void AreaLight::sampleStratified(float& pdf,
+                                 Vec3f& p,
+                                 int index,
+                                 Random& rnd,
+                                 float x,
+                                 float y,
+                                 float halfStepX,
+                                 float halfStepY) {
+    pdf = 1.f / (4.f * m_size.x * m_size.y);
+    auto jitterX = rnd.getF32(-halfStepX, halfStepX);
+    auto jitterY = rnd.getF32(-halfStepY, halfStepY);
+    Mat4f S = Mat4f::scale(Vec3f(m_size, 1));
+    p = m_xform * S * Vec3f(x + jitterX, y + jitterY, 0.f);
+}
+
 }  // namespace FW
