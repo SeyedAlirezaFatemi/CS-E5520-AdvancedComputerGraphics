@@ -40,7 +40,9 @@ App::App(std::vector<std::string>& cmd_args)
       m_toneMapWhite(1.0f),
       m_toneMapBoost(1.0f),
       m_enableSH(false),
-      m_shChanged(false) {
+      m_shChanged(false),
+      m_viewMode(FinalResult),
+      m_prevViewMode(FinalResult) {
     m_commonCtrl.showFPS(true);
     m_commonCtrl.addStateObject(this);
     m_cameraCtrl.setKeepAligned(true);
@@ -92,6 +94,11 @@ App::App(std::vector<std::string>& cmd_args)
     //    "Downscale textures by 2x"); m_commonCtrl.addButton((S32*)&m_action,
     //    Action_ChopBehindNear,          FW_KEY_NONE,    "Chop triangles behind near plane");
     //    m_commonCtrl.addSeparator();
+
+    // EXTRA
+    m_commonCtrl.addToggle((S32*)&m_viewMode, FinalResult, FW_KEY_V, "Show final result (V)");
+    m_commonCtrl.addToggle(
+        (S32*)&m_viewMode, BounceOnly, FW_KEY_B, "Show specified bounce only (B)");
 
     m_commonCtrl.addToggle((S32*)&m_action,
                            Action_ToggleSphericalHarmonics,
@@ -314,6 +321,11 @@ bool App::handleEvent(const Window::Event& ev) {
     String name;
     Mat4f mat;
 
+    if (m_viewMode != m_prevViewMode) {
+        m_prevViewMode = m_viewMode;
+        m_shChanged = true;
+    }
+
     switch (action) {
         case Action_None:
             break;
@@ -470,7 +482,11 @@ bool App::handleEvent(const Window::Event& ev) {
                                                m_rt.get(),
                                                m_numBounces,
                                                m_numDirectRays,
-                                               m_numHemisphereRays);
+                                               m_numHemisphereRays,
+                                               m_viewMode);
+            if (m_viewMode == BounceOnly) {
+                m_shChanged = true;
+            }
             m_updateClock.start();
             break;
 

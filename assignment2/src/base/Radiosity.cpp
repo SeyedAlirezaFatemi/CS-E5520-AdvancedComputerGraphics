@@ -133,7 +133,12 @@ void Radiosity::vertexTaskFunc(MulticoreLauncher::Task& task) {
         irr /= ctx.m_numHemisphereRays;
     }
 
-    ctx.m_vecResult[v] += irr;
+    if (ctx.m_viewMode == BounceOnly) {
+        ctx.m_vecResult[v] = irr;
+    } else {
+        ctx.m_vecResult[v] += irr;
+    }
+    ctx.m_vecResultTotal[v] += irr;
     ctx.m_vecCurr[v] = irr;
 }
 // --------------------------------------------------------------------------
@@ -143,8 +148,33 @@ void Radiosity::startRadiosityProcess(MeshWithColors* scene,
                                       RayTracer* rt,
                                       int numBounces,
                                       int numDirectRays,
-                                      int numHemisphereRays) {
-    // put stuff the asyncronous processor needs
+                                      int numHemisphereRays,
+                                      const ViewMode viewMode) {
+    // EXTRA
+    m_context.m_viewMode = viewMode;
+    // Check if something has been computed previously.
+    if (viewMode == BounceOnly && m_context.m_scene != nullptr) {
+        // Check if we need to compute more
+        // - 1 because of the no indirect result
+        if (numBounces > m_context.m_bounces.size() - 1) {
+            // Let's continue from last bounce.
+            m_context.m_numBounces = numBounces;
+            m_context.m_bounces.emplace_back();
+            // fire away!
+            // m_launcher.setNumThreads(m_launcher.getNumCores());	// the solution exe is
+            // multithreaded
+            m_launcher.setNumThreads(
+                1);  // but you have to make sure your code is thread safe before enabling this!
+            m_launcher.popAll();
+            m_launcher.push(vertexTaskFunc, &m_context, 0, scene->numVertices());
+            return;
+        } else {
+            m_context.m_vecResult = m_context.m_bounces[numBounces];
+            return;
+        }
+    }
+
+    // put stuff the asynchronous processor needs
     m_context.m_scene = scene;
     m_context.m_rt = rt;
     m_context.m_light = light;
@@ -158,6 +188,13 @@ void Radiosity::startRadiosityProcess(MeshWithColors* scene,
     m_context.m_vecCurr.resize(scene->numVertices());
     m_context.m_vecPrevBounce.resize(scene->numVertices());
     m_context.m_vecResult.assign(scene->numVertices(), Vec3f(0, 0, 0));
+    m_context.m_vecCurr.resize(scene->numVertices());
+
+    // EXTRA
+    m_context.m_vecResultTotal.resize(scene->numVertices());
+    m_context.m_vecResultTotal.assign(scene->numVertices(), Vec3f(0, 0, 0));
+    // + 1 because of the no indirect result
+    m_context.m_bounces.resize(numBounces + 1);
 
     m_context.m_vecSphericalC.resize(scene->numVertices());
     m_context.m_vecSphericalX.resize(scene->numVertices());
@@ -216,6 +253,9 @@ void Radiosity::checkFinish() {
         // yes, remove from task list
         m_launcher.popAll();
 
+        // EXTRA
+        m_context.m_bounces[m_context.m_currentBounce] = m_context.m_vecCurr;
+
         // more bounces desired?
         if (m_context.m_currentBounce < m_context.m_numBounces) {
             // move current bounce to prev
@@ -224,8 +264,9 @@ void Radiosity::checkFinish() {
             // start new tasks for all vertices
             m_launcher.push(vertexTaskFunc, &m_context, 0, m_context.m_scene->numVertices());
             printf("\nStarting bounce %d\n", m_context.m_currentBounce);
-        } else
+        } else {
             printf("\n DONE!\n");
+        }
     }
 }
 // --------------------------------------------------------------------------

@@ -28,6 +28,11 @@ private:
 
 namespace FW {
 
+// EXTRA
+enum ViewMode {
+    FinalResult = 0,
+    BounceOnly
+};
 
 // return a reference to a coordinate that matches some criterion, e.g. min or min of abs value
 // i guess this would go easily also with .getPtr()

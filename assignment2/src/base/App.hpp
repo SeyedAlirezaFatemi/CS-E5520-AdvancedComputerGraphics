@@ -11,7 +11,7 @@
 #include <memory>
 
 #include "RayTracer.hpp"
-
+#include "util.hpp"
 #include "AreaLight.hpp"
 #include "Radiosity.hpp"
 
@@ -90,9 +90,9 @@ private:
 		bool use_textures;			// whether or not textures are used
 		bool use_arealights;		// whether or not area light sampling is used
 		bool enable_reflections;	// whether to compute reflections in whitted integrator
-		float ao_length;			
+		float ao_length;
 	} m_settings;
-	
+
 	struct {
 		std::string state_name;										// filenames of the state and scene files
 		std::string scene_name;
@@ -124,7 +124,7 @@ private:
 
     static bool		fileExists		(const String& fileName);
 
-    // 
+    //
 	void			constructTracer(void);
 
 	void			blitRttToScreen(GLContext* gl);
@@ -167,6 +167,10 @@ private:
     Timer								m_updateClock;
 	GLuint								m_tangentBuffer, m_bitangentBuffer, m_sphericalBuffer1, m_sphericalBuffer2;
 	bool								m_enableSH, m_shChanged;
+
+    //EXTRA
+	ViewMode								m_viewMode;
+	ViewMode								m_prevViewMode;
 };
 
 

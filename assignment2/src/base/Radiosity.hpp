@@ -6,6 +6,8 @@
 #include <base/Random.hpp>
 #include <vector>
 
+#include "util.hpp"
+
 namespace FW {
 
 class AreaLight;
@@ -33,7 +35,8 @@ class Radiosity {
                                RayTracer* rt,
                                int numBounces,
                                int numDirectRays,
-                               int numHemisphereRays);
+                               int numHemisphereRays,
+                               const ViewMode viewMode);
 
     // are we still processing?
     bool isRunning() const { return m_launcher.getNumTasks() > 0; }
@@ -67,7 +70,7 @@ class Radiosity {
         int m_numBounces;
         int m_numDirectRays;
         int m_numHemisphereRays;
-        int m_currentBounce;
+        int m_currentBounce = -1;
 
         bool m_bForceExit;
 
@@ -78,10 +81,19 @@ class Radiosity {
             m_vecPrevBounce;  // Once a bounce finishes, the results are copied here to be used as
                               // the input illumination to the next bounce.
         std::vector<Vec3f>
-            m_vecResult;  // This vector should hold a sum of all bounces (used for display).
+            m_vecResult;  // This vector should hold the result to be displayed (used for display).
+
+        std::vector<Vec3f> m_vecResultTotal;  // This vector should hold a sum of all bounces (NOT
+                                              // used for display).
+
+        // EXTRA
+        std::vector<std::vector<Vec3f>> m_bounces;
+
         std::vector<Vec3f> m_vecSphericalC, m_vecSphericalX, m_vecSphericalY,
             m_vecSphericalZ;  // For the spherical harmonics extra: these hold the sums for
                               // spherical harmonic coefficients, similarly to m_vecResult.
+
+        ViewMode m_viewMode{FinalResult};
     };
 
     static void vertexTaskFunc(MulticoreLauncher::Task&);
