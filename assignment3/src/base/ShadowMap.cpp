@@ -33,11 +33,13 @@ void LightSource::renderShadowedScene(GLContext *gl,
                 uniform mat4 posToClip;    // projection * view of _camera_
                 uniform mat4 posToCamera;  // view matrix
                 uniform mat3 normalToCamera;
-                attribute vec3 positionAttrib;  // world space coordinates of this vertex
+
+                attribute vec3 positionAttrib;  // ! world space coordinates of this vertex
                 attribute vec3 normalAttrib;
                 attribute vec4 vcolorAttrib;  // (workaround: "colorAttrib" appears to confuse
                                               // certain ATI drivers.)
                 attribute vec2 texCoordAttrib;
+
                 centroid varying vec3 positionVarying;
                 centroid varying vec3 normalVarying;
                 centroid varying vec4 colorVarying;
@@ -45,8 +47,8 @@ void LightSource::renderShadowedScene(GLContext *gl,
                 uniform bool renderFromLight;
 
                 // Here starts the part you'll need to be concerned with.
-                // The uniform variables are the "inputs" to the shader. They are filled in prior to
-                // drawing using setUniform() calls (see the end of the renderShadowedScene()
+                // ! The uniform variables are the "inputs" to the shader. They are filled in prior
+                // to drawing using setUniform() calls (see the end of the renderShadowedScene()
                 // function).
 
                 // The transformation to light's clip space.
@@ -58,9 +60,9 @@ void LightSource::renderShadowedScene(GLContext *gl,
                 // passes the values to the fragment (pixel) shader, in correspondingly named
                 // variables.
 
-                // Your code will need to compute the position of the vertex from the light's point
-                // of view. It should be in the clip space of the light, just like gl_Position is in
-                // the clip space of the camera.
+                // ! Your code will need to compute the position of the vertex from the light's
+                // point of view. It should be in the clip space of the light, just like gl_Position
+                // is in the clip space of the camera.
                 varying vec4 posLightClip;
 
                 // Feel free to define whatever else you might need. Use uniforms to bring in stuff
@@ -88,7 +90,7 @@ void LightSource::renderShadowedScene(GLContext *gl,
 
                     // YOUR CODE HERE (R3): Compute the position of vertex in the light's clip space
                     // and pass it to the fragment shader.
-
+                    posLightClip = posToLightClip * pos;
                     // Debug hack that renders the scene from the light's view, activated by a
                     // toggle button in the UI:
                     if (renderFromLight) {
@@ -102,7 +104,7 @@ void LightSource::renderShadowedScene(GLContext *gl,
                 // vertex shader is done. The ultimate task of the fragment shader is to assign a
                 // value to vec4 gl_FragColor. That value will be written to the screen (or wherever
                 // we're drawing, possibly into a texture).
-
+                // #define PI 3.1415926538;
                 // Boilerplate, no need to touch:
                 uniform bool hasNormals; uniform bool hasDiffuseTexture;
                 uniform bool hasAlphaTexture;
@@ -111,6 +113,7 @@ void LightSource::renderShadowedScene(GLContext *gl,
                 uniform float glossiness;
                 uniform sampler2D diffuseSampler;
                 uniform sampler2D alphaSampler;
+
                 centroid varying vec3 positionVarying;
                 centroid varying vec3 normalVarying;
                 centroid varying vec4 colorVarying;
@@ -169,7 +172,16 @@ void LightSource::renderShadowedScene(GLContext *gl,
                     // you want the latter.
                     vec3 shading = diffuseColor.rgb;  // placeholder
                     float cone = 1.0;                 // placeholder
-
+                    // lightPosEye
+                    // lightDirEye is the cone axis
+                    // lightFOVRad positionVarying normalVarying
+                    float squareDistance = dot(positionVarying - lightPosEye, positionVarying - lightPosEye);
+                    vec3 incoming = normalize(positionVarying - lightPosEye);
+                    float diffuseSurface = max(-dot(incoming, normalVarying), 0);
+                    float diffuseLight = max(dot(incoming, lightDirEye), 0);
+                    float cosWithConeAxis = dot(incoming, lightDirEye);
+                    shading *= diffuseLight * diffuseSurface * (1/3.1415926538) * (1/squareDistance) * lightE;
+                    cone = max(0, min(1, 4 * (cosWithConeAxis - cos(lightFOVRad/2)) / (1 - cos(lightFOVRad/2))));
                     // YOUR CODE HERE (R3):
                     // Here you need to transform the position in light's clip space into light's
                     // NDC space to get the depth value and the UV coordinates for reading the
