@@ -7,7 +7,7 @@ Mat4f LightSource::getPosToLightClip() const {
     // You'll need to construct the matrix that sends world space points to
     // points in the light source's clip space. You'll need to somehow use
     // m_xform, which describes the light source pose, and Mat4f::perspective().
-    return Mat4f();  // placeholder
+    return Mat4f::perspective(getFOV(), getNear(), getFar()) * m_xform.inverted();
 }
 
 void LightSource::renderShadowedScene(GLContext *gl,
@@ -175,13 +175,18 @@ void LightSource::renderShadowedScene(GLContext *gl,
                     // lightPosEye
                     // lightDirEye is the cone axis
                     // lightFOVRad positionVarying normalVarying
-                    float squareDistance = dot(positionVarying - lightPosEye, positionVarying - lightPosEye);
+                    float squareDistance =
+                        dot(positionVarying - lightPosEye, positionVarying - lightPosEye);
                     vec3 incoming = normalize(positionVarying - lightPosEye);
                     float diffuseSurface = max(-dot(incoming, normalVarying), 0);
                     float diffuseLight = max(dot(incoming, lightDirEye), 0);
                     float cosWithConeAxis = dot(incoming, lightDirEye);
-                    shading *= diffuseLight * diffuseSurface * (1/3.1415926538) * (1/squareDistance) * lightE;
-                    cone = max(0, min(1, 4 * (cosWithConeAxis - cos(lightFOVRad/2)) / (1 - cos(lightFOVRad/2))));
+                    shading *= diffuseLight * diffuseSurface * (1 / 3.1415926538) *
+                               (1 / squareDistance) * lightE;
+                    cone = max(0,
+                               min(1,
+                                   4 * (cosWithConeAxis - cos(lightFOVRad / 2)) /
+                                       (1 - cos(lightFOVRad / 2))));
                     // YOUR CODE HERE (R3):
                     // Here you need to transform the position in light's clip space into light's
                     // NDC space to get the depth value and the UV coordinates for reading the
@@ -195,6 +200,10 @@ void LightSource::renderShadowedScene(GLContext *gl,
                     // can transform between these spaces by affine transformations, i.e. multiply,
                     // then add.
                     float shadow = 1.0;
+                    vec3 ndcLight = (posLightClip / posLightClip.w).xyz;
+                    // depth from the shadow map. Mapped to [-1, 1]
+                    float depth = texture2D(shadowSampler, (ndcLight.xy + 1) * 0.5).g * 2 - 1;
+                    shadow = ndcLight.z <= depth ? 1.0 : 0.0;
 
                     vec3 result = shading * shadow * cone;
 
@@ -261,15 +270,15 @@ void LightSource::renderShadowMap(FW::GLContext *gl,
 
                 // VERTEX SHADER
 
-                // The posToLightClip uniform will be used to transform the world coordinate points
-                // of the scene. They should end up in the clip coordinates of the light source
-                // "camera". If you look below, you'll see that its value is set based on the
+                // ! The posToLightClip uniform will be used to transform the world coordinate
+                // points of the scene. They should end up in the clip coordinates of the light
+                // source "camera". If you look below, you'll see that its value is set based on the
                 // function getWorldToLightClip(), which you'll need to implement.
                 uniform mat4 posToLightClip; attribute vec3 positionAttrib;
 
                 void main() {
                     // YOUR CODE HERE (R3): Transform the vertex to the light's clip space.
-                    gl_Position = vec4(positionAttrib, 1.0);  // placeholder
+                    gl_Position = posToLightClip * vec4(positionAttrib, 1.0);
                 }),
             FW_GL_SHADER_SOURCE(
                 // FRAGMENT SHADER
