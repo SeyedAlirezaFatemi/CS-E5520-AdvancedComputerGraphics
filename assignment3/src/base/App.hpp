@@ -1,37 +1,30 @@
 #pragma once
 
+#include <memory>
+#include <vector>
 
-#include "gui/Window.hpp"
+#include "3d/CameraControls.hpp"
+#include "InstantRadiosity.hpp"
+#include "RayTracer.hpp"
+#include "ShadowMap.hpp"
+#include "gpu/Buffer.hpp"
 #include "gui/CommonControls.hpp"
 #include "gui/Image.hpp"
-#include "3d/CameraControls.hpp"
-#include "gpu/Buffer.hpp"
-
-#include <vector>
-#include <memory>
-
-#include "RayTracer.hpp"
-
-#include "ShadowMap.hpp"
-#include "InstantRadiosity.hpp"
-
+#include "gui/Window.hpp"
 
 namespace FW {
 
-
 //------------------------------------------------------------------------
 
-class App : public Window::Listener, public CommonControls::StateObject
-{
-private:
-    enum Action
-    {
+class App : public Window::Listener, public CommonControls::StateObject {
+   private:
+    enum Action {
         Action_None,
 
         Action_LoadMesh,
         Action_ReloadMesh,
         Action_SaveMesh,
-		Action_LoadBVH,
+        Action_LoadBVH,
 
         Action_ResetCamera,
         Action_EncodeCameraSignature,
@@ -53,124 +46,122 @@ private:
         Action_DupVertsPerSubmesh,
         Action_FixMaterialColors,
         Action_DownscaleTextures,
-		Action_ChopBehindNear,
+        Action_ChopBehindNear,
 
         Action_TracePrimaryRays,
         Action_PlaceLightSourceAtCamera
     };
 
-    enum CullMode
-    {
+    enum CullMode {
         CullMode_None = 0,
         CullMode_CW,
         CullMode_CCW,
     };
 
-    struct RayVertex
-    {
-        Vec3f       pos;
-        U32         color;
+    struct RayVertex {
+        Vec3f pos;
+        U32 color;
     };
 
-	enum bvh_build_method { None, SAH };
-	enum SamplingType { AO_sampling, AA_sampling };
-	// this structure holds the necessary arguments when rendering using command line parameters
-	struct {
-		bool batch_render;
-		SplitMode splitMode;		// the BVH builder to use
-		int spp;					// samples per pixel to use
-		SamplingType sample_type;	// AO or AA sampling; AO includes one extra sample for the primary ray
-		bool output_images;			// might be useful to compare images with the example
-		bool use_textures;			// whether or not textures are used
-		bool use_arealights;		// whether or not area light sampling is used
-		bool enable_reflections;	// whether to compute reflections in whitted integrator
-		float ao_length;			
-	} m_settings;
-	
-	struct {
-		std::string state_name;										// filenames of the state and scene files
-		std::string scene_name;
-		int rayCount;
-		int build_time, trace_time;
+    enum bvh_build_method { None, SAH };
+    enum SamplingType { AO_sampling, AA_sampling };
+    // this structure holds the necessary arguments when rendering using command line parameters
+    struct {
+        bool batch_render;
+        SplitMode splitMode;  // the BVH builder to use
+        int spp;              // samples per pixel to use
+        SamplingType
+            sample_type;      // AO or AA sampling; AO includes one extra sample for the primary ray
+        bool output_images;   // might be useful to compare images with the example
+        bool use_textures;    // whether or not textures are used
+        bool use_arealights;  // whether or not area light sampling is used
+        bool enable_reflections;  // whether to compute reflections in whitted integrator
+        float ao_length;
+    } m_settings;
 
-	} m_results;
+    struct {
+        std::string state_name;  // filenames of the state and scene files
+        std::string scene_name;
+        int rayCount;
+        int build_time, trace_time;
 
-public:
-					 App			(std::vector<std::string>& cmd_args);
-    virtual         ~App            (void);
+    } m_results;
 
-    virtual bool    handleEvent     (const Window::Event& ev);
-    virtual void    readState       (StateDump& d);
-    virtual void    writeState      (StateDump& d) const;
+   public:
+    App(std::vector<std::string>& cmd_args);
+    virtual ~App(void);
 
-private:
-	void			process_args	(std::vector<std::string>& args);
+    virtual bool handleEvent(const Window::Event& ev);
+    virtual void readState(StateDump& d);
+    virtual void writeState(StateDump& d) const;
 
-    void            waitKey         (void);
-    void            renderFrame     (GLContext* gl);
-    void            loadMesh        (const String& fileName);
-    void            saveMesh        (const String& fileName);
-    void            loadRayDump     (const String& fileName);
+   private:
+    void process_args(std::vector<std::string>& args);
 
-    static void     downscaleTextures(MeshBase* mesh);
-    static void     chopBehindPlane (MeshBase* mesh, const Vec4f& pleq);
+    void waitKey(void);
+    void renderFrame(GLContext* gl);
+    void loadMesh(const String& fileName);
+    void saveMesh(const String& fileName);
+    void loadRayDump(const String& fileName);
 
-    static bool		fileExists		(const String& fileName);
+    static void downscaleTextures(MeshBase* mesh);
+    static void chopBehindPlane(MeshBase* mesh, const Vec4f& pleq);
 
-    // 
-	void			constructTracer(void);
+    static bool fileExists(const String& fileName);
 
-	void			blitRttToScreen(GLContext* gl);
+    //
+    void constructTracer(void);
 
-    void			setupShaders	(GLContext* gl);
-    void			setupRenderToTexture(const Vec2i& resolution);
-    void			deleteRenderToTexture();
-    void			blitShadowMapToScreen(GLContext* gl, const LightSource& ls);
+    void blitRttToScreen(GLContext* gl);
 
-private:
-                    App             (const App&); // forbidden
-    App&            operator=       (const App&); // forbidden
+    void setupShaders(GLContext* gl);
+    void setupRenderToTexture(const Vec2i& resolution);
+    void deleteRenderToTexture();
+    void blitShadowMapToScreen(GLContext* gl, const LightSource& ls);
 
-private:
-    Window          m_window;
-    CommonControls  m_commonCtrl;
-    CameraControls  m_cameraCtrl;
+   private:
+    App(const App&);             // forbidden
+    App& operator=(const App&);  // forbidden
 
-    Action          m_action;
-    String          m_meshFileName;
-    CullMode        m_cullMode;
-	Timer			m_timer;
+   private:
+    Window m_window;
+    CommonControls m_commonCtrl;
+    CameraControls m_cameraCtrl;
 
-    std::unique_ptr<RayTracer>			m_rt;
-	std::vector<Vec3f>				    m_rtVertexPositions; // kept only for MD5 checksums
-    std::vector<RTTriangle>				m_rtTriangles;
+    Action m_action;
+    String m_meshFileName;
+    CullMode m_cullMode;
+    Timer m_timer;
 
-    std::unique_ptr<MeshWithColors>     m_mesh;
-    std::unique_ptr<LightSource>    	m_lightSource;
-    int									m_numHemisphereRays;
-    float								m_lightSize;
-    float								m_toneMapWhite;
-    float								m_toneMapBoost;
-    Timer								m_updateClock;
+    std::unique_ptr<RayTracer> m_rt;
+    std::vector<Vec3f> m_rtVertexPositions;  // kept only for MD5 checksums
+    std::vector<RTTriangle> m_rtTriangles;
 
-    ShadowMapContext					m_smcontext;
-    InstantRadiosity					m_instantRadiosity;
-    float								m_shadowMapVisMultiplier;
-    float								m_lightFOV;
-    float								m_indirectFOV;
-    float								m_lightIntensity;
-    bool								m_visualizeLight;
-    bool								m_visualizeIndirect;
-    bool								m_renderFromLight;
-    int									m_num_indirect;
-    int									m_smResolutionLevel;
-    int									m_smResolutionLevelPrev;
+    std::unique_ptr<MeshWithColors> m_mesh;
+    std::unique_ptr<LightSource> m_lightSource;
+    int m_numHemisphereRays;
+    float m_lightSize;
+    float m_toneMapWhite;
+    float m_toneMapBoost;
+    Timer m_updateClock;
 
-    GLuint								m_rttFBO;
-    GLuint								m_rttDepth;
-    GLuint								m_rttTex;
+    ShadowMapContext m_smcontext;
+    InstantRadiosity m_instantRadiosity;
+    float m_shadowMapVisMultiplier;
+    float m_lightFOV;
+    float m_indirectFOV;
+    float m_lightIntensity;
+    bool m_visualizeLight;
+    bool m_visualizeIndirect;
+    bool m_renderFromLight;
+    int m_num_indirect;
+    int m_smResolutionLevel;
+    int m_smResolutionLevelPrev;
+
+    GLuint m_rttFBO;
+    GLuint m_rttDepth;
+    GLuint m_rttTex;
 };
 
-
 //------------------------------------------------------------------------
-}
+}  // namespace FW
