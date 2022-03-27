@@ -1,19 +1,16 @@
 
 #include "Bvh.hpp"
-#include "filesaves.hpp"
 
 #include <algorithm>
 
+#include "filesaves.hpp"
 
 namespace FW {
 
-
-Bvh::Bvh() { }
-
+Bvh::Bvh() {}
 
 // reconstruct from a file
-Bvh::Bvh(std::istream& is)
-{
+Bvh::Bvh(std::istream& is) {
     // Load file header.
     fileload(is, mode_);
     Statusbar nodeInfo("Loading nodes", 0);
@@ -24,9 +21,9 @@ Bvh::Bvh(std::istream& is)
         size_t size;
         fileload(is, size);
 
-        for(size_t i = 0; i < size; ++i) {
+        for (size_t i = 0; i < size; ++i) {
             uint32_t idx;
-			loader(idx);
+            loader(idx);
             indices_.push_back(idx);
         }
     }
@@ -45,7 +42,7 @@ void Bvh::save(std::ostream& os) {
     {
         filesave(os, (size_t)indices_.size());
 
-        for(auto& i : indices_) {
+        for (auto& i : indices_) {
             saver(i);
         }
     }
@@ -54,4 +51,4 @@ void Bvh::save(std::ostream& os) {
     rootNode_->save(saver);
 }
 
-}
+}  // namespace FW
