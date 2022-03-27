@@ -15,6 +15,8 @@ namespace FW {
 class RayTracer;
 class GLContext;
 
+Vec3f getDiffuse(const RTTriangle& triangle, float u, float v);
+
 //------------------------------------------------------------------------
 
 typedef Mesh<VertexPNTC> MeshWithColors;

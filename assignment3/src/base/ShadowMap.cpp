@@ -170,19 +170,22 @@ void LightSource::renderShadowedScene(GLContext *gl,
                     // Be careful with the lightFOVRad -- it contains the angle of full angle of
                     // opening, which is twice the angle of the cone against its axis. Often times
                     // you want the latter.
-                    vec3 shading = diffuseColor.rgb;  // placeholder
-                    float cone = 1.0;                 // placeholder
-                    // lightPosEye
+                    vec3 shading = diffuseColor.rgb;
+                    float cone = 1.0;
                     // lightDirEye is the cone axis
-                    // lightFOVRad positionVarying normalVarying
-                    float squareDistance =
-                        dot(positionVarying - lightPosEye, positionVarying - lightPosEye);
+                    // lightPosEye lightFOVRad positionVarying normalVarying
+                    // min with 10 because the indirect lights can cause some very bright spots if
+                    // they land near corners.
+                    float inverseSquareDistance =
+                        min(1.0 / dot(positionVarying - lightPosEye, positionVarying - lightPosEye),
+                            10);
                     vec3 incoming = normalize(positionVarying - lightPosEye);
                     float diffuseSurface = max(-dot(incoming, normalVarying), 0);
                     float diffuseLight = max(dot(incoming, lightDirEye), 0);
                     float cosWithConeAxis = dot(incoming, lightDirEye);
-                    shading *= diffuseLight * diffuseSurface * (1 / 3.1415926538) *
-                               (1 / squareDistance) * lightE;
+                    // 1 / PI = 0.3183098861624923
+                    shading *= diffuseLight * diffuseSurface * (0.3183098861624923) *
+                               inverseSquareDistance * lightE;
                     cone = max(0,
                                min(1,
                                    4 * (cosWithConeAxis - cos(lightFOVRad / 2)) /
@@ -324,6 +327,17 @@ void LightSource::renderShadowMap(FW::GLContext *gl,
     glDrawBuffer(GL_BACK);
 }
 
+Vec3f getRandomPointHalfSphere(Random &rnd, float r) {
+    float x, y,
+        sumSquares = 2.0f;  // Initialize with 2.0f so we enter the while loop
+    while (sumSquares > 1) {
+        x = rnd.getF32(-1, 1);
+        y = rnd.getF32(-1, 1);
+        sumSquares = FW::pow(x, 2) + FW::pow(y, 2);
+    }
+    return Vec3f(x * r, y * r, FW::sqrt(1 - sumSquares * FW::pow(r, 2)));
+}
+
 void LightSource::sampleEmittedRays(int num,
                                     std::vector<Vec3f> &origs,
                                     std::vector<Vec3f> &dirs,
@@ -340,6 +354,15 @@ void LightSource::sampleEmittedRays(int num,
     // Fill the three vectors with #num ray origins, directions, and intensities divided by
     // probability density. Note that the lambert cosine of the diffuse area light will cancel out.
 
+    // sin(f/2) = r
+    float f = getFOVRad();
+    float radius = FW::sin(f / 2.0f);
+    auto basis = formBasis(getNormal());
+    for (size_t i = 0; i < num; i++) {
+        dirs.push_back(basis * Vec3f(getRandomPointHalfSphere(rand, radius)) * getFar());
+        E_times_pdf.push_back(getEmission() * radius * radius / static_cast<float>(num));
+        origs.push_back(getPosition());
+    }
     // See the instructions.
 }
 

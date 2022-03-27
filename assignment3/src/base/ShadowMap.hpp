@@ -11,6 +11,8 @@
 
 namespace FW {
 
+Vec3f getRandomPointHalfSphere(Random& rnd, float r);
+
 //------------------------------------------------------------------------
 
 typedef Mesh<VertexPNTC> MeshWithColors;

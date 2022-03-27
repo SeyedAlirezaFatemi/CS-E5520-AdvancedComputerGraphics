@@ -31,7 +31,7 @@ void InstantRadiosity::castIndirect(RayTracer* rt,
     // Loop through the rays and fill in the corresponding lights in m_indirectLights
     // based on what happens to the ray.
     for (int i = 0; i < num; i++) {
-        RaycastResult hit;  // = rt->raycast(origs[i], dirs[i]);
+        RaycastResult hit = rt->raycast(origs[i], dirs[i]);
 
         if (hit.tri != nullptr) {
             // YOUR CODE HERE (R4):
@@ -39,9 +39,12 @@ void InstantRadiosity::castIndirect(RayTracer* rt,
             // color it based on the texture or diffuse color, etc. (see the LightSource declaration
             // for the list of things that a light source needs to have) A lot of this code is like
             // in the Assignment 2's corresponding routine.
-
+            m_indirectLights[i].setEmission(E_times_pdf[i] * getDiffuse(*hit.tri, hit.u, hit.v));
+            m_indirectLights[i].setFOV(m_indirectFOV);
+            m_indirectLights[i].setOrientation(-formBasis(hit.tri->normal()));
+            m_indirectLights[i].setPosition(hit.point);
             // Replace this with true once your light is ready to be used in rendering:
-            m_indirectLights[i].setEnabled(false);
+            m_indirectLights[i].setEnabled(true);
         } else {
             // If we missed the scene, disable the light so it's skipped in all rendering
             // operations.
@@ -50,10 +53,27 @@ void InstantRadiosity::castIndirect(RayTracer* rt,
     }
 }
 
+Vec3f getDiffuse(const RTTriangle& triangle, float u, float v) {
+    const Texture& diffuseTex = triangle.m_material->textures[MeshBase::TextureType_Diffuse];
+    if (diffuseTex.exists()) {
+        Vec2f uv{(1.0f - (u + v)) * triangle.m_vertices[0].t + u * triangle.m_vertices[1].t +
+                 v * triangle.m_vertices[2].t};
+        const Image& img = *diffuseTex.getImage();
+        Vec2i texelCoords = getTexelCoords(uv, img.getSize());
+        return img.getVec4f(texelCoords).getXYZ();
+    }
+    return triangle.m_material->diffuse.getXYZ();
+}
+
 void InstantRadiosity::renderShadowMaps(MeshWithColors* scene) {
     // YOUR CODE HERE (R4):
     // Loop through all lights, and call the shadow map renderer for those that are enabled.
     // (see App::renderFrame for an example usage of the shadow map rendering call)
+    for (auto& light : m_indirectLights) {
+        if (light.isEnabled()) {
+            light.renderShadowMap(m_gl, scene, &m_smContext);
+        }
+    }
 }
 
 //////////// Stuff you probably will not need to touch:
