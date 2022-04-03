@@ -182,7 +182,7 @@ void LightSource::renderShadowedScene(GLContext *gl,
                     vec3 incoming = normalize(positionVarying - lightPosEye);
                     float diffuseSurface = max(-dot(incoming, normalVarying), 0);
                     float diffuseLight = max(dot(incoming, lightDirEye), 0);
-                    float cosWithConeAxis = dot(incoming, lightDirEye);
+                    float cosWithConeAxis = max(dot(incoming, lightDirEye), 0);
                     // 1 / PI = 0.3183098861624923
                     shading *= diffuseLight * diffuseSurface * (0.3183098861624923) *
                                inverseSquareDistance * lightE;
