@@ -93,7 +93,7 @@ App::App(std::vector<std::string>& cmd_args)
 	m_commonCtrl.addToggle(&m_playbackVisualization, FW_KEY_NONE, "Visualization playback");
 	m_commonCtrl.beginSliderStack();
 	m_commonCtrl.addSlider(&m_numBounces, 0, 8, false, FW_KEY_NONE, FW_KEY_NONE, "Number of indirect bounces= %d", 0, &clear_on_next_frame);
-	m_commonCtrl.addSlider(&m_lightSize, 0.01f, 200.0f, false, FW_KEY_NONE, FW_KEY_NONE, "Light source area= %f", 0, &clear_on_next_frame);
+	m_commonCtrl.addSlider(&m_lightSize, 0.01f, 50.0f, false, FW_KEY_NONE, FW_KEY_NONE, "Light source area= %f", 0, &clear_on_next_frame);
 	m_commonCtrl.endSliderStack();
 	m_commonCtrl.beginSliderStack();
 	m_commonCtrl.addSlider(&m_numDebugPathCount, 1, 1000, false, FW_KEY_NONE, FW_KEY_NONE, "Number of debug paths to fire= %d");
@@ -124,7 +124,7 @@ int find_argument(std::string needle, std::vector<std::string> haystack) {
 	for (unsigned j = 0; j < haystack.size(); ++j)
 		if (!haystack[j].compare(needle))
 			return j;
-	
+
 	return -1;
 }
 
@@ -160,11 +160,11 @@ void App::process_args(std::vector<std::string>& args) {
 		case output_images:
 			m_settings.output_images = true;
 			break;
-		
+
 		case use_textures:
 			m_settings.use_textures = true;
 			break;
-		
+
 		case AO:
 			m_settings.sample_type = AO_sampling;
 			break;
@@ -199,7 +199,7 @@ void App::process_args(std::vector<std::string>& args) {
 			case builder_None:
 				m_settings.splitMode = SplitMode_None;
 				break;
-			
+
 			case builder_SAH:
 				m_settings.splitMode = SplitMode_Sah;
 				break;
@@ -723,7 +723,7 @@ void App::loadMesh(const String& fileName)
 
 	// convert input mesh to colored format
 	m_mesh.reset(new MeshWithColors(*mesh));
-	
+
 
 
 	// fix input colors to white so we see something
@@ -824,7 +824,7 @@ void App::constructTracer()
 #ifdef _WIN64
 		hierarchyName += "_x64";
 #endif
-		
+
 		hierarchyName += ".hierarchy";
 
 		String hierarchyCacheFile = hierarchyName.c_str();
@@ -840,7 +840,7 @@ void App::constructTracer()
 			// no, construct...
 			LARGE_INTEGER start, stop, frequency;
 			QueryPerformanceFrequency(&frequency);
-			QueryPerformanceCounter(&start); // Start time stamp		
+			QueryPerformanceCounter(&start); // Start time stamp
 
 			m_rt->constructHierarchy(m_rtTriangles, m_settings.splitMode);
 
@@ -859,8 +859,8 @@ void App::constructTracer()
 
 		LARGE_INTEGER start, stop, frequency;
 		QueryPerformanceFrequency(&frequency);
-		QueryPerformanceCounter(&start); // Start time stamp		
-		
+		QueryPerformanceCounter(&start); // Start time stamp
+
 		m_rt->constructHierarchy(m_rtTriangles, m_settings.splitMode);
 
 		QueryPerformanceCounter(&stop); // Stop time stamp

@@ -173,8 +173,6 @@ Vec3f PathTraceRenderer::tracePath(float image_x,
         // YOUR CODE HERE (R2-R4):
         // Implement path tracing with direct light and shadows, scattering and Russian roulette.
         while (result.tri != nullptr) {
-            // Doesn't happen in the scene.
-            // Ei += result.tri->m_material->emission;
             MeshBase::Material* mat = result.tri->m_material;
             Vec3f diffuse = mat->diffuse.getXYZ();
             Vec3f n(result.tri->normal());  // Will be smoothed in getTextureParameters
@@ -199,6 +197,8 @@ Vec3f PathTraceRenderer::tracePath(float image_x,
                 Ei += throughput * diffuse * light->getEmission() * cosTheta * cosThetaL /
                       (lightPDF * lenSqr(toLight) * FW_PI);
             }
+
+            Ei += throughput * diffuse * result.tri->m_material->emission;
 
             if (debugVis) {
                 // Example code for using the visualization system. You can expand this to include
