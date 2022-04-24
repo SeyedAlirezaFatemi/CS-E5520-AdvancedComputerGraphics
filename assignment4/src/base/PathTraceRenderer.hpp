@@ -31,6 +31,7 @@ struct PathTracerBlock {
     int m_height;  ///< Pixel height of the block.
 };
 
+std::tuple<Vec3f, float> getRandomPointHalfSphere(Random& rnd);
 struct PathTracerContext {
     PathTracerContext();
     ~PathTracerContext();

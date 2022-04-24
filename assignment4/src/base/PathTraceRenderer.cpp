@@ -22,6 +22,66 @@ void PathTraceRenderer::getTextureParameters(const RaycastResult& hit,
     // Read value from albedo texture into diffuse.
     // If textured, use the texture; if not, use Material.diffuse.
     // Note: You can probably reuse parts of the radiosity assignment.
+    Vec2f uv{(1.0f - (hit.u + hit.v)) * hit.tri->m_vertices[0].t +
+             hit.u * hit.tri->m_vertices[1].t + hit.v * hit.tri->m_vertices[2].t};
+    Texture& diffuseTex =
+        mat->textures[MeshBase::TextureType_Diffuse];  // note: you can fetch other kinds
+                                                       // of textures like this too. By
+                                                       // default specular maps,
+                                                       // displacement maps and alpha
+                                                       // stencils are loaded too if the
+                                                       // .mtl file specifies them.
+    if (diffuseTex.exists())  // check whether material uses a diffuse texture
+    {
+        const Image& img = *diffuseTex.getImage();
+        // fetch diffuse color from texture
+        Vec2i texelCoords = getTexelCoords(uv, img.getSize());
+        diffuse = img.getVec4f(texelCoords).getXYZ();
+    }
+    Texture& normalTex = mat->textures[MeshBase::TextureType_Normal];
+    if (normalTex.exists() && m_normalMapped)  // check whether material uses a normal map
+    {
+        const Image& img = *normalTex.getImage();
+        // Do tangent space normal mapping
+        // first, get texel coordinates as above, for the rest, see handout
+        // http://www.opengl-tutorial.org/intermediate-tutorials/tutorial-13-normal-mapping/
+        Vec2i texelCoords = getTexelCoords(uv, img.getSize());
+        auto normal = 2.0f * img.getVec4f(texelCoords).getXYZ() - 1.0f;
+        const auto& v0 = hit.tri->m_vertices[0].p;
+        const auto& v1 = hit.tri->m_vertices[1].p;
+        const auto& v2 = hit.tri->m_vertices[2].p;
+        const auto& uv0 = hit.tri->m_vertices[0].t;
+        const auto& uv1 = hit.tri->m_vertices[1].t;
+        const auto& uv2 = hit.tri->m_vertices[2].t;
+        // Edges of the triangle : position delta
+        auto deltaPos1 = v1 - v0;
+        auto deltaPos2 = v2 - v0;
+        // UV delta
+        auto deltaUV1 = uv1 - uv0;
+        auto deltaUV2 = uv2 - uv0;
+        float r = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x);
+        auto tangent = normalize((deltaPos1 * deltaUV2.y - deltaPos2 * deltaUV1.y) * r);
+        auto bitangent = normalize((deltaPos2 * deltaUV1.x - deltaPos1 * deltaUV2.x) * r);
+        auto triangleNormal = hit.tri->normal();
+        Mat3f tbn;
+        tbn.setCol(0, tangent);
+        tbn.setCol(1, bitangent);
+        tbn.setCol(2, triangleNormal);
+        n = tbn * normal;
+    } else {
+        // Get smooth normals
+        // Interpolate the vertex normals to the hit position and normalize it
+        n = (1.0f - (hit.u + hit.v)) * hit.tri->m_vertices[0].n + hit.u * hit.tri->m_vertices[1].n +
+            hit.v * hit.tri->m_vertices[2].n;
+    }
+    n = normalize(n);
+    // Read a value from the specular texture into specular_mult.
+    Texture& specularTex = mat->textures[MeshBase::TextureType_Specular];
+    if (specularTex.exists()) {
+        const Image& img = *specularTex.getImage();
+        Vec2i texelCoords = getTexelCoords(uv, img.getSize());
+        specular = img.getVec4f(texelCoords).getXYZ();
+    }
 }
 
 PathTracerContext::PathTracerContext()
@@ -49,6 +109,8 @@ Vec3f PathTraceRenderer::tracePath(float image_x,
                                    int samplerBase,
                                    Random& R,
                                    std::vector<PathVisualizationNode>& visualization) {
+    static constexpr float RR_TERMINATION_THRESH = .2f;
+
     const MeshWithColors* scene = ctx.m_scene;
     RayTracer* rt = ctx.m_rt;
     Image* image = ctx.m_image.get();
@@ -69,8 +131,11 @@ Vec3f PathTraceRenderer::tracePath(float image_x,
     // Simple ray generation code, you can use this if you want to.
 
     // Generate a ray through the pixel.
-    float x = (float)image_x / image->getSize().x * 2.0f - 1.0f;
-    float y = (float)image_y / image->getSize().y * -2.0f + 1.0f;
+    // Randomize coordinates in the pixel.
+    float x = ((float)image_x + R.getF32(0.f, 1.f)) / image->getSize().x * 2.0f - 1.0f;
+    float y = ((float)image_y + R.getF32(0.f, 1.f)) / image->getSize().y * -2.0f + 1.0f;
+    // float x = (float)image_x / image->getSize().x * 2.0f - 1.0f;
+    // float y = (float)image_y / image->getSize().y * -2.0f + 1.0f;
 
     // point on front plane in homogeneous coordinates
     Vec4f P0(x, y, 0.0f, 1.0f);
@@ -95,36 +160,100 @@ Vec3f PathTraceRenderer::tracePath(float image_x,
     const RTTriangle* pHit = result.tri;
 
     // if we hit something, fetch a color and insert into image
-    Vec3f Ei;
-    Vec3f throughput(1, 1, 1);
-    float p = 1.0f;
-
+    Vec3f Ei{0.f};
+    Vec3f throughput{1.f};
+    bool rr = false;
+    bool rrStarted = false;
+    int bounces = ctx.m_bounces;
+    if (ctx.m_bounces < 0) {
+        rr = true;
+        bounces = -bounces;
+    }
     if (result.tri != nullptr) {
         // YOUR CODE HERE (R2-R4):
         // Implement path tracing with direct light and shadows, scattering and Russian roulette.
+        while (result.tri != nullptr) {
+            // Doesn't happen in the scene.
+            // Ei += result.tri->m_material->emission;
+            MeshBase::Material* mat = result.tri->m_material;
+            Vec3f diffuse = mat->diffuse.getXYZ();
+            Vec3f n(result.tri->normal());  // Will be smoothed in getTextureParameters
+            Vec3f specular = mat->specular;
+            getTextureParameters(result, diffuse, n, specular);
+            // Gamma correction
+            diffuse.x = pow(diffuse.x, 2.2f);
+            diffuse.y = pow(diffuse.y, 2.2f);
+            diffuse.z = pow(diffuse.z, 2.2f);
+            // Nudge the hit point very slightly towards the normal
+            Vec3f hitPoint = result.point + 1e-5f * n;
+            // Shadow ray
+            float lightPDF;
+            Vec3f lightPoint;
+            light->sample(lightPDF, lightPoint, 0, R);
+            auto toLight = lightPoint - hitPoint;
+            RaycastResult shadowResult = rt->raycast(hitPoint, toLight);
+            if (shadowResult.tri == nullptr) {
+                // Light visible
+                auto cosThetaL = max(light->getNormal().dot(normalize(-toLight)), 0.f);
+                auto cosTheta = max(n.dot(normalize(toLight)), 0.f);
+                Ei += throughput * diffuse * light->getEmission() * cosTheta * cosThetaL /
+                      (lightPDF * lenSqr(toLight) * FW_PI);
+            }
 
-        Ei = result.tri->m_material->diffuse.getXYZ();  // placeholder
+            if (debugVis) {
+                // Example code for using the visualization system. You can expand this to include
+                // further bounces, shadow rays, and whatever other useful information you can think
+                // of.
+                PathVisualizationNode node;
+                node.lines.push_back(PathVisualizationLine(
+                    result.orig, result.point));  // Draws a line between two points
+                node.lines.push_back(PathVisualizationLine(
+                    result.point,
+                    result.point + result.tri->normal() * .1f,
+                    Vec3f(1, 0, 0)));  // You can give lines a color as optional parameter.
+                node.labels.push_back(PathVisualizationLabel(
+                    "diffuse: " + std::to_string(Ei.x) + ", " + std::to_string(Ei.y) + ", " +
+                        std::to_string(Ei.z),
+                    result.point));  // You can also render text labels with world-space locations.
 
-        if (debugVis) {
-            // Example code for using the visualization system. You can expand this to include
-            // further bounces, shadow rays, and whatever other useful information you can think of.
-            PathVisualizationNode node;
-            node.lines.push_back(PathVisualizationLine(
-                result.orig, result.point));  // Draws a line between two points
-            node.lines.push_back(PathVisualizationLine(
-                result.point,
-                result.point + result.tri->normal() * .1f,
-                Vec3f(1, 0, 0)));  // You can give lines a color as optional parameter.
-            node.labels.push_back(PathVisualizationLabel(
-                "diffuse: " + std::to_string(Ei.x) + ", " + std::to_string(Ei.y) + ", " +
-                    std::to_string(Ei.z),
-                result.point));  // You can also render text labels with world-space locations.
+                visualization.push_back(node);
+            }
 
-            visualization.push_back(node);
+            if (bounces == 0 && !rr) {
+                // We're done
+                break;
+            }
+            // Continue the path
+            auto [local_direction, pdf] = getRandomPointHalfSphere(R);
+            auto basis = formBasis(n);
+            auto direction = normalize(basis * local_direction);
+            result = rt->raycast(hitPoint, direction * 100);
+            throughput *= diffuse * direction.dot(n) / (FW_PI * pdf);
+            if (bounces == 0 && !rrStarted) {
+                rrStarted = true;
+                throughput *= (1.0f / RR_TERMINATION_THRESH);
+            }
+            if (rrStarted) {
+                if (R.getF32(0.f, 1.f) < RR_TERMINATION_THRESH) {
+                    break;
+                }
+            }
+            bounces--;
         }
     }
-
     return Ei;
+}
+
+std::tuple<Vec3f, float> getRandomPointHalfSphere(Random& rnd) {
+    float x, y,
+        sumSquares = 2.0f;  // Initialize with 2.0f so we enter the while loop
+    while (sumSquares > 1) {
+        x = rnd.getF32(-1, 1);
+        y = rnd.getF32(-1, 1);
+        sumSquares = FW::pow(x, 2) + FW::pow(y, 2);
+    }
+    float z = FW::sqrt(1 - sumSquares);
+    return std::make_tuple(Vec3f(x, y, z), z / FW_PI);
 }
 
 // This function is responsible for asynchronously generating paths for a given block.
@@ -172,6 +301,7 @@ void PathTraceRenderer::pathTraceBlock(MulticoreLauncher::Task& t) {
 
         // Put pixel.
         Vec4f prev = image->getVec4f(Vec2i(pixel_x, pixel_y));
+        // Update previous value
         prev += Vec4f(Ei, 1.0f);
         image->setVec4f(Vec2i(pixel_x, pixel_y), prev);
     }
