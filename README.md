@@ -1,6 +1,6 @@
 # CS-E5520 Advanced Computer Graphics
 
-This repository contains my solutions to the assignments of the Computer Graphics course.
+This repository contains my solutions to the assignments of the Advanced Computer Graphics course.
 
 Path tracer screenshots:
 
